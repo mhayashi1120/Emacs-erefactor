@@ -45,7 +45,7 @@
 ;;; TODO
 ;; * Display find process status.
 ;; * Can call function.
-;; * Describe command calling.
+;; * Describe how to call command.
 
 ;;; Code:
 
@@ -207,12 +207,6 @@
       (insert (nth n find-select-history))
       (setq find-select-history-position n)))))
 
-;; TODO
-(defun find-select-start-with-xargs ()
-  (let ((infile (find-select-create-temp)))
-    (call-process "xargs" infile )))
-
-
 (defun find-select-create-temp ()
   (let ((temp (make-temp-file "EmacsFind"))
 	(coding-system-for-write file-name-coding-system))
@@ -268,6 +262,7 @@
     (if arg
 	(progn
 	  ;;TODO use find-select-args-string ?
+	  ;;TODO when error?
 	  (setq find-args (find-select-args-string-safe))
 	  (find-select-commit main-buffer)
 	  (find-dired default-directory find-args))
@@ -288,6 +283,19 @@
 	    (set-process-filter proc 'find-select-find-filter)))
 	(find-select-commit main-buffer)
 	(switch-to-buffer buffer)))))
+
+;; TODO
+(defun find-select-start-with-xargs ()
+  (interactive)
+  (error "Not implement yet")
+  ;; (let ((infile (find-select-create-temp)))
+  ;;   (call-process "xargs" infile ))
+  )
+
+;;TODO
+(defun find-select-shell-command ()
+  (interactive)
+  (error "Not implement yet"))
 
 (defun find-select-commit (buffer)
   (add-to-history 'find-select-history (with-current-buffer buffer (buffer-string)))
