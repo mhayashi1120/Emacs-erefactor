@@ -20,13 +20,14 @@
 ;; Boston, MA 02110-1301, USA.
 
 ;;; Commentary:
-;; 
 
-;; find-select provides to edit find complex arguments and to display
-;; full command line to small buffer.
+;; You can use `find' command-line option like S Expression.
+;; Make easy way of editing find complex arguments and to display
+;; full command-line to small buffer.
 ;;
 
 ;;; Install:
+
 ;; Put this file into load-path'ed directory, and byte compile it if
 ;; desired.  And put the following expression into your ~/.emacs.
 ;;
@@ -37,7 +38,22 @@
 ;; http://repo.or.cz/w/emacs.git/blob_plain/HEAD:/lisp/find-cmd.el
 
 ;;; Usage:
+
+;; Following command open editable buffer.
+;;
+;;    M-x find-select
 ;; 
+;; You can edit `find' command-line option like s-expression following.
+;;
+;; (or (name "HOGE") (type "f")) (type "d")
+;;
+;; This expand to 
+;;
+;; find /some/directory \( -name HOGE -or -type f \) -type d 
+;;
+;; Type C-c C-c execute above command and display command output.
+;; Type C-c C-q quit editing.
+;; Type M-n, M-p move history when exists.
 
 ;;; History:
 ;; 
@@ -46,12 +62,12 @@
 ;; * Display find process status.
 ;; * Can call function.
 ;; * Describe how to call command.
+;; * Can complete symbol.
 
 ;;; Code:
 
 (require 'find-cmd)
 
-(defvar current-prefix-arg)
 (defvar find-program)
 
 (defvar find-select-buffer-name " *Find Select* ")
@@ -92,11 +108,12 @@
 (define-minor-mode find-select-minor-mode
   "Minor mode to build `find' command args by using `fsvn-cmd'"
   nil nil find-select-mode-map
-  (set (make-local-variable 'post-command-hook) nil)
+  (set (make-local-variable 'after-change-functions) nil)
   (set (make-local-variable 'kill-buffer-hook) nil)
   (set (make-local-variable 'find-select-previous-window-configuration) nil)
   (set (make-local-variable 'find-select-history-position) nil)
-  (add-hook 'post-command-hook 'find-select-show-command)
+  (set (make-local-variable 'window-configuration-change-hook) nil)
+  (add-hook 'after-change-functions 'find-select-show-command)
   (add-hook 'kill-buffer-hook 'find-select-cleanup)
   (message (substitute-command-keys 
 	    (concat "Type \\[find-select-execute] to execute find, "
@@ -141,7 +158,7 @@
       (insert event)
       (set-buffer-modified-p nil))))
 
-(defun find-select-show-command ()
+(defun find-select-show-command (&rest dummy)
   (condition-case nil
       (let ((buf (get-buffer-create find-select-sub-buffer-name))
 	    args win parse-error)
@@ -155,14 +172,16 @@
 	    (cond
 	     (args
 	      (insert (find-select-put-face (concat find-program " " default-directory " ")
-					       'font-lock-constant-face))
-	      (insert (find-select-put-face args 'font-lock-keyword-face) "\n"))
+					    'font-lock-constant-face))
+	      (insert (find-select-put-face args 'font-lock-variable-name-face) "\n"))
 	     (t
 	      (insert (find-select-put-face (format "%s" parse-error)
-					       'font-lock-warning-face))))))
-	(setq win (display-buffer buf))
-	(when (window-live-p win)
-	  ;;TODO calculate height
+					    'font-lock-warning-face)))))
+	  (setq buffer-read-only t)
+	  (set-buffer-modified-p nil))
+	(unless (memq buf (mapcar 'window-buffer (window-list)))
+	  (setq win (split-window-vertically))
+	  (set-window-buffer win buf)
 	  (set-window-text-height win 5)))
     ;; ignore all
     (error nil)))
@@ -255,7 +274,8 @@
       (delete-process proc))))
 
 (defun find-select-execute (&optional arg)
-  "Execute `find' with editing args."
+  "Execute `find' with editing args.
+Optional ARG means execute `find-dired' with same arguments."
   (interactive "P")
   (let ((main-buffer (current-buffer))
 	find-args)
@@ -307,7 +327,7 @@
   )
 
 (defun find-select ()
-  ;; execute find and display command line to buffer.
+  ;; execute find and display command-line to buffer.
   ;; electric mode
   ;; execute buffer buffer with call-process-region
   (interactive)
@@ -321,7 +341,7 @@
       (setq find-select-previous-window-configuration config)
       (erase-buffer)
       (set-buffer-modified-p nil))
-    (switch-to-buffer buffer)))
+    (select-window (display-buffer buffer))))
 
 
 
