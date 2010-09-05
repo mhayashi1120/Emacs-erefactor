@@ -180,7 +180,7 @@ digit is replacing to gathered item that is captured by
   (let (regexp)
     (setq regexp
 	  (read-from-minibuffer prompt nil nil nil
-				'regexp-history ;; todo suspicious changed ok???
+				'regexp-history ;; todo suspicious change this history?
 				nil t))
     (list regexp)))
 
@@ -192,7 +192,7 @@ digit is replacing to gathered item that is captured by
     (setq prompt-last (gather-matching-previous-as-prompt))
     (setq num 
 	  (gather-read-number
-	   (format "%s Subexp(<= %d): "	;todo change word font
+	   (format "%s Subexp(<= %d): "
 		   prompt-last subexp-max)
 	   0 subexp-max))
     (when universal-arg
