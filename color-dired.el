@@ -37,7 +37,7 @@
 ;; http://www.bookshelf.jp/soft/meadow_25.html#SEC288
 
 ;;; TODO:
-;; * (require 'ls-lisp) destroy this function.
+;; * (require 'ls-lisp) destroy this feature.
 
 ;;; Code:
 
