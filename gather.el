@@ -33,6 +33,11 @@
 ;; desired. And put the following expression into your ~/.emacs.
 ;;
 ;;     (require 'gather)
+;;     (define-key ctl-x-r-map "\M-w" 'gather-matching-kill-save)
+;;     (define-key ctl-x-r-map "\C-w" 'gather-matching-kill)
+;;     (define-key ctl-x-r-map "\M-y" 'gather-matched-insert)
+;;     (define-key ctl-x-r-map "\M-Y" 'gather-matched-insert-with-format)
+;;     (define-key ctl-x-r-map "v" 'gather-matched-show)
 
 ;;; Usage: 
 
@@ -42,39 +47,23 @@
 ;; C-x r M-Y : Insert killed text as formatted text to point.
 ;; C-x r v   : View killed text status.
 
+
 ;;; Code:
 
 (defvar gather-killed nil)
 (defvar gather-matching-regexp-ring nil)
-
-(defmacro gather-matching-in-region (&rest body)
-  `(let (start end)
-     (if (and transient-mark-mode mark-active)
-	 (setq start (region-beginning)
-	       end (region-end))
-       (setq start (point-min)
-	     end (point-max)))
-     (save-restriction
-       (narrow-to-region start end)
-       (progn
-	 ,@body)
-       (gather-matched-show))))
 
 (defun gather-matching-kill-save (regexp)
   "Gather matching regexp save to `gather-killed'.
 Use \\[gather-matched-insert] or \\[gather-matched-insert-with-format] after capture.
 "
   (interactive (gather-matching-read-args "Regexp: "))
-  (gather-matching-regexp-ring-add regexp)
-  (gather-matching-in-region
-   (setq gather-killed (gather-matching regexp))))
+  (gather-matching-do-command regexp nil))
 
 (defun gather-matching-kill (regexp)
   "Same as `gather-matching-kill-save' but delete matched strings."
   (interactive (gather-matching-read-args "Regexp: "))
-  (gather-matching-regexp-ring-add regexp)
-  (gather-matching-in-region
-    (setq gather-killed (gather-matching regexp 'erase))))
+  (gather-matching-do-command regexp 'erase))
 
 (defun gather-matched-insert (subexp &optional separator)
   "Insert `gather-killed' that was set by 
@@ -134,12 +123,25 @@ digit is replacing to gathered item that is captured by
      (t
       (message "Gathered %d elements." num)))))
 
+(defun gather-matching-do-command (regexp erasep)
+  (gather-matching-regexp-ring-add regexp)
+  (let (start end)
+    (if (and transient-mark-mode mark-active)
+	(setq start (region-beginning)
+	      end (region-end))
+      (setq start (point-min)
+	    end (point-max)))
+    (save-restriction
+      (narrow-to-region start end)
+      (setq gather-killed (gather-matching regexp erasep))
+      (gather-matched-show))))
+
 (defun gather-matching (regexp &optional erasep no-property)
   (let ((depth (regexp-opt-depth regexp))
 	erase-subexp
 	return-list matching-func)
     (when (string-match regexp "")
-      (signal 'invalid-regexp '("regexp match nothing.")))
+      (signal 'invalid-regexp '("Regexp match to nothing.")))
     (when erasep 
       (cond
        ((integerp erasep)
@@ -180,11 +182,12 @@ digit is replacing to gathered item that is captured by
   (let (regexp)
     (setq regexp
 	  (read-from-minibuffer prompt nil nil nil
-				'regexp-history ;; todo suspicious change this history?
+				'regexp-history
 				nil t))
     (list regexp)))
 
 (defun gather-matched-insert-read-args ()
+  (barf-if-buffer-read-only)
   (let ((universal-arg current-prefix-arg)
 	num subexp-max prompt-last sep)
     (setq subexp-max 
@@ -200,6 +203,7 @@ digit is replacing to gathered item that is captured by
     (list num sep)))
 
 (defun gather-matched-insert-format-read-args ()
+  (barf-if-buffer-read-only)
   (let ((universal-arg current-prefix-arg)
 	format prompt-last sep)
     (setq prompt-last (gather-matching-previous-as-prompt))
@@ -245,17 +249,6 @@ digit is replacing to gathered item that is captured by
 	(setq ret (concat ret (nth index args)))))
     (setq ret (concat ret (substring format-string search-start)))
     ret))
-
-(unless (key-binding "\C-xr\M-w")
-  (define-key ctl-x-r-map "\M-w" 'gather-matching-kill-save))
-(unless (key-binding "\C-xr\C-w")
-  (define-key ctl-x-r-map "\C-w" 'gather-matching-kill))
-(unless (key-binding "\C-xr\M-y")
-  (define-key ctl-x-r-map "\M-y" 'gather-matched-insert))
-(unless (key-binding "\C-xr\M-Y")
-  (define-key ctl-x-r-map "\M-Y" 'gather-matched-insert-with-format))
-(unless (key-binding "\C-xrv")
-  (define-key ctl-x-r-map "v" 'gather-matched-show))
 
 (provide 'gather)
 
