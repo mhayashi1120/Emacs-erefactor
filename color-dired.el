@@ -95,6 +95,7 @@
      (t
       "%b %e"))))
 
+;; `regexp-opt' is generating different regexp.
 (if (> emacs-major-version 22)
     (defun color-dired-regexp-opt (strings)
       (regexp-opt strings))
