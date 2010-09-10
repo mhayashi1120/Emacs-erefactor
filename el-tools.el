@@ -1,3 +1,34 @@
+;;; el-tools.el --- Emacs-Lisp tools
+
+;; Author: Hayashi Masahiro <mhayashi1120@gmail.com>
+;; Keywords: lisp refactor lint
+;; URL: TODO
+;; Emacs: GNU Emacs 22 or later
+
+;; This program is free software; you can redistribute it and/or
+;; modify it under the terms of the GNU General Public License as
+;; published by the Free Software Foundation; either version 3, or (at
+;; your option) any later version.
+
+;; This program is distributed in the hope that it will be useful, but
+;; WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;; General Public License for more details.
+
+;; You should have received a copy of the GNU General Public License
+;; along with GNU Emacs; see the file COPYING.  If not, write to the
+;; Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;; Boston, MA 02110-1301, USA.
+
+;;; Commentary:
+
+;; Following utilities for Emacs-Lisp.
+;; * Refactoring.
+;; * Lint.
+
+;;; Install:
+
+;; Put this file into load-path'ed directory, and byte compile it if
 ;; desired. And put the following expression into your ~/.emacs.
 ;;
 ;;     (require 'el-tools)
