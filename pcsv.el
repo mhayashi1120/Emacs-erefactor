@@ -2,7 +2,7 @@
 
 ;; Author: Hayashi Masahiro <mhayashi1120@gmail.com>
 ;; Keywords: csv parse rfc4180
-;; URL: http://gist.github.com/573561.txt
+;; URL: http://github.com/mhayashi1120/Emacs-Lisp/raw/master/pcsv.el
 ;; Emacs: GNU Emacs 21 or later
 
 ;; This program is free software; you can redistribute it and/or

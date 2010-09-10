@@ -2,7 +2,7 @@
 
 ;; Author: Hayashi Masahiro <mhayashi1120@gmail.com>
 ;; Keywords: grep edit result writable
-;; URL: http://gist.github.com/556053.txt
+;; URL: http://github.com/mhayashi1120/Emacs-Lisp/raw/master/find-select.el
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
