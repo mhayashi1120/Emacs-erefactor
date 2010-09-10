@@ -3,6 +3,7 @@
 ;; Author: Hayashi Masahiro <mhayashi1120@gmail.com>
 ;; Keywords: rectangle edit
 ;; URL: http://github.com/mhayashi1120/Emacs-Lisp/raw/master/rect+.el
+;; Emacs: GNU Emacs 21 or later
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as

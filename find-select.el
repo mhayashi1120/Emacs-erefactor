@@ -1,7 +1,7 @@
 ;;; find-select.el --- find file utilities
 
 ;; Author: Hayashi Masahiro <mhayashi1120@gmail.com>
-;; Keywords: grep edit result writable
+;; Keywords: find command result xargs
 ;; URL: http://github.com/mhayashi1120/Emacs-Lisp/raw/master/find-select.el
 
 ;; This program is free software; you can redistribute it and/or
@@ -22,14 +22,14 @@
 ;;; Commentary:
 
 ;; You can use `find' command-line option like S Expression.
-;; Make easy way of editing find complex arguments and to display
+;; Provides easy way of editing find complex arguments and to display
 ;; full command-line to small buffer.
 ;;
 
 ;;; Install:
 
 ;; Put this file into load-path'ed directory, and byte compile it if
-;; desired.  And put the following expression into your ~/.emacs.
+;; desired. And put the following expression into your ~/.emacs.
 ;;
 ;;     (require 'find-select)
 
@@ -39,30 +39,34 @@
 
 ;;; Usage:
 
-;; Following command open editable buffer.
+;; * Following command open editable buffer.
 ;;
 ;;    M-x find-select
 ;; 
-;; You can edit `find' command-line option like s-expression following.
+;; * You can edit `find' command-line option by s-expression like following.
 ;;
 ;; (or (name "HOGE") (type "f")) (type "d")
 ;;
 ;; This expand to 
 ;;
-;; find /some/directory \( -name HOGE -or -type f \) -type d 
+;; find /any/default-directory \( -name HOGE -or -type f \) -type d 
 ;;
 ;; Type C-c C-c execute above command and display command output.
+;;      With prefix-arguments, call `find-dired'
 ;; Type C-c C-q quit editing.
 ;; Type M-n, M-p move history when exists.
+;;
+;; * TODO in result buffer
 
 ;;; History:
-;; 
 
-;;; TODO
-;; * Display find process status.
+
+;;; TODO:
+
 ;; * Can call function.
 ;; * Describe how to call command.
-;; * Can complete symbol.
+;; * Can complete symbol. auto-complete.el?
+;; * Reconsider to use compile.el or not 
 
 ;;; Code:
 
@@ -171,12 +175,12 @@
 	    (erase-buffer)
 	    (cond
 	     (args
-	      (insert (find-select-put-face (concat find-program " " default-directory " ")
-					    'font-lock-constant-face))
-	      (insert (find-select-put-face args 'font-lock-variable-name-face) "\n"))
+	      (insert (propertize (concat find-program " " default-directory " ")
+				  'face 'font-lock-constant-face))
+	      (insert (propertize args 'face 'font-lock-variable-name-face) "\n"))
 	     (t
-	      (insert (find-select-put-face (format "%s" parse-error)
-					    'font-lock-warning-face)))))
+	      (insert (propertize (format "%s" parse-error)
+				  'face 'font-lock-warning-face)))))
 	  (setq buffer-read-only t)
 	  (set-buffer-modified-p nil))
 	(unless (memq buf (mapcar 'window-buffer (window-list)))
@@ -185,10 +189,6 @@
 	  (set-window-text-height win 5)))
     ;; ignore all
     (error nil)))
-
-(defun find-select-put-face (string face)
-  (put-text-property 0 (length string) 'face face string)
-  string)
 
 (defun find-select-args-string ()
   (let ((subfinds (find-select-read-expressions)))
@@ -245,6 +245,8 @@
     (setq list (nreverse list))
     (mapconcat 'identity list "\000")))
 
+(defvar find-select-running-process nil)
+
 
 
 (defun find-select-previous-history ()
@@ -298,19 +300,30 @@ Optional ARG means execute `find-dired' with same arguments."
 	    (setq default-directory dir)
 	    ;;TODO for cmd.exe
 	    (setq proc (start-process "Select file by find" (current-buffer) 
-				      shell-file-name "-c" command-line))
-	    (set-process-sentinel proc (lambda (p e)))
-	    (set-process-filter proc 'find-select-find-filter)))
+				      shell-file-name shell-command-switch command-line))
+	    (set-process-sentinel proc (lambda (p e)
+					 (when (eq (process-status p) 'exit)
+					   (with-current-buffer (process-buffer p)
+					     (setq mode-line-process 
+						   (propertize ":exit" 'face 
+							       (if (> (process-exit-status p) 0)
+								   'compilation-warning
+								 'compilation-info)))))))
+	    (set-process-filter proc 'find-select-find-filter)
+	    (setq mode-line-process 
+		  (propertize ":run" 'face 'compilation-warning))))
 	(find-select-commit main-buffer)
 	(switch-to-buffer buffer)))))
 
 ;; TODO
-(defun find-select-start-with-xargs ()
-  (interactive)
-  (error "Not implement yet")
-  ;; (let ((infile (find-select-create-temp)))
-  ;;   (call-process "xargs" infile ))
-  )
+(defun find-select-start-with-xargs (command)
+  (interactive (let ((command 
+		      (read-shell-command "Shell command: ")))
+		 (list command)))
+  (let ((infile (find-select-create-temp)))
+    ;; (call-process "xargs" infile )
+    (format "xargs -e %s < %s" command infile)
+    ))
 
 ;;TODO
 (defun find-select-shell-command ()

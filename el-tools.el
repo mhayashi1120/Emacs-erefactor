@@ -28,8 +28,12 @@
 
 ;;; Install:
 
-;; Put this file into load-path'ed directory, and byte compile it if
-;; desired. And put the following expression into your ~/.emacs.
+;; Download refactor.el from
+;; http://github.com/mhayashi1120/Emacs-gauche-ext/raw/master/refactor.el
+
+;; Put this file and refactor.el into load-path'ed directory, 
+;; and byte compile its if desired. 
+;; And put the following expression into your ~/.emacs.
 ;;
 ;;     (require 'el-tools)
 ;;     (add-hook 'emacs-lisp-mode-hook

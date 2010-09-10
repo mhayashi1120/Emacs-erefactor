@@ -1,8 +1,9 @@
 ;;; gather.el --- Gather string in buffer.
 
 ;; Author: Hayashi Masahiro <mhayashi1120@gmail.com>
-;; Keywords: gather utility regexp
+;; Keywords: utility regexp
 ;; URL: http://github.com/mhayashi1120/Emacs-Lisp/raw/master/gather.el
+;; Emacs: GNU Emacs 21 or later
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -22,7 +23,7 @@
 ;;; Commentary:
 
 ;; gather.el provides search regexp and kill text. This is not replacing
-;; Emacs `kill-ring' mechanism.
+;; nor modifying Emacs `kill-ring' mechanism.
 ;; Have similar concept of `occur'. If I think `occur' have line oriented 
 ;; feature, gather.el have list oriented feature. You can handle the list,
 ;; as long as you can handle Emacs-Lisp list object.
@@ -49,6 +50,9 @@
 
 
 ;;; Code:
+
+(defvar transient-mark-mode)
+(defvar current-prefix-arg)
 
 (defvar gather-killed nil)
 (defvar gather-matching-regexp-ring nil)
@@ -96,7 +100,7 @@ Then insert following text.
 
 FORMAT accept `format' function or C printf like `%' prefixed sequence.
 But succeeding char can be `digit' or `{digit}' (ex: %1, %{1}, %{10} but cannot be %10)
-digit is replacing to gathered item that is captured by
+digit is replacing to gathered items that is captured by
 `gather-matching-kill-save', `gather-matching-kill'.
 "
   (interactive (gather-matched-insert-format-read-args))
@@ -166,6 +170,7 @@ digit is replacing to gathered item that is captured by
 	    (setq i (1+ i)))
 	  (setq small-list (nreverse small-list))
 	  (when erase-subexp 
+	    ;;TODO???
 	    (barf-if-buffer-read-only)
 	    (replace-match "" erase-subexp))
 	  (setq return-list 
