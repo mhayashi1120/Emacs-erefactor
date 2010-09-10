@@ -3,6 +3,7 @@
 ;; Author: Hayashi Masahiro <mhayashi1120@gmail.com>
 ;; Keywords: dired color
 ;; URL: http://gist.github.com/566057.txt
+;; Emacs: GNU Emacs 22 or later
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -27,7 +28,7 @@
 ;;; Install:
 
 ;; Put this file into load-path'ed directory, and byte compile it if
-;; desired.  And put the following expression into your ~/.emacs.
+;; desired. And put the following expression into your ~/.emacs.
 ;;
 ;;     (require 'color-dired)
 
@@ -40,6 +41,13 @@
 ;; * (require 'ls-lisp) destroy this feature.
 
 ;;; Code:
+
+(defvar emacs-major-version)
+
+(defgroup color-dired nil
+  "Colored dired."
+  :group 'dired
+  :prefix "color-dired-")
 
 (cond
  ((boundp 'facemenu-unlisted-faces)
@@ -104,7 +112,8 @@
 
 (defcustom color-dired-date-format (color-dired-guessed-date-format)
   "*Format of dired displaying. See `format-time-string'" 
-  )
+  :group 'color-dired
+  :type 'string)
 
 (defcustom color-dired-time-regexp 
   (concat
@@ -115,7 +124,9 @@
      (mapcar (lambda (x) (format "%2d" x)) (number-sequence 0 23))
      (mapcar 'number-to-string (number-sequence 0 23))))
    ":[0-5][0-9]")
-  "*Time format append to `color-dired-date-format'")
+  "*Time format append to `color-dired-date-format'"
+  :group 'color-dired
+  :type 'string)
 
 (defconst color-dired-search-keywords
   '((color-dired-today-search . color-dired-changed-today-face)
