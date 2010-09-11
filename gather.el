@@ -40,6 +40,15 @@
 ;;     (define-key ctl-x-r-map "\M-Y" 'gather-matched-insert-with-format)
 ;;     (define-key ctl-x-r-map "v" 'gather-matched-show)
 
+;; ******** Emacs 22 or earlier ***********
+;;     (require 'gather)
+;;     (global-set-key "\C-xr\M-w" 'gather-matching-kill-save)
+;;     (global-set-key "\C-xr\C-w" 'gather-matching-kill)
+;;     (global-set-key "\C-xr\M-y" 'gather-matched-insert)
+;;     (global-set-key "\C-xr\M-Y" 'gather-matched-insert-with-format)
+;;     (global-set-key "\C-xrv" 'gather-matched-show)
+
+
 ;;; Usage: 
 
 ;; C-x r M-w : Kill the regexp in current-buffer.

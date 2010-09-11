@@ -84,6 +84,7 @@
   :group 'el-tools)
 
 (defvar el-tools-refactor-read-symbol-history nil)
+(defvar el-tools-refactor-read-prefix-history nil)
 (defvar el-tools-refactor-module-alist nil)
 
 (defun el-tools-refactor-matched-prefix (symbol)
@@ -115,6 +116,9 @@
 
 (defun el-tools-refactor-rename-symbol-read-args ()
   (refactor-rename-symbol-read-args 'el-tools-refactor-read-symbol-history))
+
+(defun el-tools-refactor-change-prefix-read-args ()
+  (refactor-change-prefix-read-args 'el-tools-refactor-read-prefix-history))
 
 (defun el-tools-refactor-find-global-binding (symbol)
   (save-excursion
@@ -295,10 +299,15 @@
 (defun el-tools-refactor-rename-symbol-in-buffer (old-name new-name)
   "Rename symbol at point."
   (interactive (el-tools-refactor-rename-symbol-read-args))
-  (barf-if-buffer-read-only)
   (let (region)
     (setq region (el-tools-refactor-find-local-binding old-name))
     (refactor-rename-region old-name new-name region)))
+
+(defun el-tools-refactor-change-prefix-in-buffer (old-prefix new-prefix)
+  "Rename symbol at point."
+  (interactive (el-tools-refactor-change-prefix-read-args))
+  (refactor-change-symbol-prefix old-prefix new-prefix))
+
 
 ;;TODO????
 (defun el-tools-refactor-change-by-regexp-sample ()
@@ -570,6 +579,7 @@ Optional argument CODING-SYSTEM FILE's coding-system."
 
 	  (define-key map "R" 'el-tools-refactor-rename-symbol-in-package)
 	  (define-key map "r" 'el-tools-refactor-rename-symbol-in-buffer)
+	  (define-key map "c" 'el-tools-refactor-change-prefix-in-buffer)
 	  ;; (define-key map "B" 'el-tools-refactor-build-modules)
 	  ;; (define-key map "b" 'el-tools-refactor-build-module-buffer)
 	  ;; (define-key map "L" 'el-tools-refactor-load-module-alist)

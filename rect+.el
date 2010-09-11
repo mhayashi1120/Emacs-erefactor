@@ -1,4 +1,4 @@
-;;; rect+.el --- Extensions for rect.el
+;;; rect+.el --- Extensions to rect.el
 
 ;; Author: Hayashi Masahiro <mhayashi1120@gmail.com>
 ;; Keywords: rectangle edit
@@ -22,7 +22,7 @@
 
 ;;; Commentary:
 
-;; rect+.el provides extensions for rect.el
+;; rect+.el provides extensions to rect.el
 
 ;;; Install:
 

@@ -36,11 +36,23 @@
 
 ;; This program is inspired from following url.
 ;; http://www.bookshelf.jp/soft/meadow_25.html#SEC288
+;; http://homepage1.nifty.com/blankspace/emacs/dired.html
+
+;;; Usage:
+
+;; You can change the face by changing following variables.
+;; `color-dired-changed-today-face'
+;; `color-dired-changed-this-week-face'
+;; `color-dired-changed-last-week-face'
+;; `color-dired-changed-last-week-before-face'
 
 ;;; TODO:
 ;; * (require 'ls-lisp) destroy this feature.
 
 ;;; Code:
+
+(eval-when-compile
+  (require 'cl))
 
 (defvar emacs-major-version)
 
@@ -49,37 +61,61 @@
   :group 'dired
   :prefix "color-dired-")
 
-(cond
- ((boundp 'facemenu-unlisted-faces)
-  (add-to-list 'facemenu-unlisted-faces 'color-dired-changed-today-face)
-  (add-to-list 'facemenu-unlisted-faces 'color-dired-changed-this-week-face)
-  (add-to-list 'facemenu-unlisted-faces 'color-dired-changed-last-week-face)
-  (add-to-list 'facemenu-unlisted-faces 'color-dired-changed-last-week-before-face))
- (t
-  ;; for Emacs22
-  (add-to-list 'facemenu-listed-faces 'color-dired-changed-today-face)
-  (add-to-list 'facemenu-listed-faces 'color-dired-changed-this-week-face)
-  (add-to-list 'facemenu-listed-faces 'color-dired-changed-last-week-face)
-  (add-to-list 'facemenu-listed-faces 'color-dired-changed-last-week-before-face)))
+(defface color-dired-changed-today-default-face 
+  '(
+    (((class color)
+      (background light))
+     (:foreground "Green" :weight bold))
+    (((class color)
+      (background dark))
+     (:foreground "light green" :weight bold)))
+  "Font lock mode face used to highlight changed in this day."
+  :group 'color-dired)
 
-;; TODO add class
-(defface color-dired-changed-today-face 
-  '((t (:foreground "Green"))) nil)
-(defface color-dired-changed-this-week-face 
-  '((t (:foreground "SpringGreen"))) nil)
-(defface color-dired-changed-last-week-face 
-  '((t (:foreground "DarkSeaGreen3"))) nil)
-(defface color-dired-changed-last-week-before-face
-  '((t (:foreground "DarkSeaGreen4"))) nil)
+(defface color-dired-changed-this-week-default-face 
+  '(
+    (((class color)
+      (background light))
+     (:foreground "SpringGreen" :weight bold))
+    (((class color)
+      (background dark))
+     (:foreground "SpringGreen" :weight bold)))
+  "Font lock mode face used to highlight changed in this week."
+  :group 'color-dired)
+
+(defface color-dired-changed-last-week-default-face 
+  '(
+    (((class color)
+      (background light))
+     (:foreground "MediumSpringGreen"))
+    (((class color)
+      (background dark))
+     (:foreground "MediumSpringGreen")))
+  "Font lock mode face used to highlight changed in last week."
+  :group 'color-dired)
+
+(defface color-dired-changed-last-week-before-default-face
+  '(
+    (((class color)
+      (background light))
+     (:foreground "GreenYellow"))
+    (((class color)
+      (background dark))
+     (:foreground "GreenYellow")))
+  "Font lock mode face used to highlight changed in last week before."
+  :group 'color-dired)
 
 (defvar color-dired-changed-today-face 
-  'color-dired-changed-today-face)
+  'color-dired-changed-today-default-face)
+
 (defvar color-dired-changed-this-week-face 
-  'color-dired-changed-this-week-face)
+  'color-dired-changed-this-week-default-face)
+
 (defvar color-dired-changed-last-week-face 
-  'color-dired-changed-last-week-face)
+  'color-dired-changed-last-week-default-face)
+
 (defvar color-dired-changed-last-week-before-face 
-  'color-dired-changed-last-week-before-face)
+  'color-dired-changed-last-week-before-default-face)
 
 (defvar color-dired-last-week-before-regexp nil)
 (defvar color-dired-last-week-regexp nil)
