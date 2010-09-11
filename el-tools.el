@@ -39,6 +39,18 @@
 ;;     (add-hook 'emacs-lisp-mode-hook
 ;;        (lambda ()
 ;;          (define-key emacs-lisp-mode-map "\C-c\C-v" el-tools-map)))
+;;
+;; And set `el-tools-clean-lint-path-alist', `el-tools-clean-lint-emacsen'
+
+;;; Usage:
+;; C-c C-v l : elint current buffer
+;; C-c C-v L : elint current buffer by multiple emacs binaries.
+;;             See `el-tools-clean-lint-emacsen'
+;; C-c C-v r : Rename symbol in current buffer. 
+;;             Resolve `let' binding as log as i can.
+
+;;; TODO:
+;; * Flymake? Server process?
 
 ;;; Code:
 
@@ -243,7 +255,7 @@
 		 (eq 'quote (caadr form))
 		 (symbolp (setq require-form (cadadr form))))
 	(throw 'found require-form))
-      (mapcar
+      (mapc
        (lambda (x)
 	 (when (listp x)
 	   (when (setq module (el-tools-refactor-form-requiring-module x))
@@ -419,7 +431,11 @@ Examples:
   (el-tools-clean-lint-initialize)
   (let ((command (expand-file-name (invocation-name) (invocation-directory)))
 	(file (expand-file-name (buffer-file-name))))
-    (el-tools-clean-lint-internal command file)))
+    (let ((proc (el-tools-clean-lint-internal command file)))
+      (set-process-sentinel proc
+			    (lambda (p e)
+			      (when (eq (process-status p) 'exit)
+				(el-tools-clean-lint-exit-mode-line p)))))))
 
 (defun el-tools-clean-lint-emacsen ()
   (interactive)
@@ -442,12 +458,19 @@ Examples:
       (set-process-sentinel 
        proc
        `(lambda (p e)
-	  (when (and (eq (process-status p) 'exit)
-		     ',rest)
+	  (when (eq (process-status p) 'exit)
 	    (with-current-buffer (process-buffer p)
-	      (let (buffer-read-only)
-		(insert "\n\n")))
-	    (el-tools-clean-lint-async ,file ',rest)))))))
+	      (el-tools-clean-lint-append "\n\n")
+	      (el-tools-clean-lint-exit-mode-line p))
+	    (when ',rest
+	      (el-tools-clean-lint-async ,file ',rest))))))))
+
+(defun el-tools-clean-lint-exit-mode-line (process)
+  (with-current-buffer (process-buffer process)
+    (let* ((code (process-exit-status process))
+	   (msg  (format " (Exit [%d])" code)))
+      (setq mode-line-process 
+	    (propertize msg 'face (if (= code 0) 'compilation-info 'compilation-error))))))
 
 ;; TODO 22 or 23 not works?
 (defun el-tools-clean-lint-internal (command file)
@@ -470,13 +493,13 @@ Examples:
     (setq cmdline (format "%s -batch -eval \"%s\"" command eval-form))
     (display-buffer buffer)
     (with-current-buffer buffer
-      (let (buffer-read-only)
-	(insert cmdline "\n")
-	(let ((proc (start-process "Clean Lint" (current-buffer) 
-				   shell-file-name shell-command-switch
-				   cmdline)))
-	  (set-process-sentinel proc (lambda (p e)))
-	  proc)))))
+      (el-tools-clean-lint-append cmdline "\n")
+      (let ((proc (start-process "Clean Lint" (current-buffer) 
+				 shell-file-name shell-command-switch
+				 cmdline)))
+	(set-process-sentinel proc (lambda (p e)))
+	(setq mode-line-process (propertize " (Running)" 'face 'compilation-warning))
+	proc))))
 
 (defun el-tools-clean-lint-initialize ()
   (with-current-buffer (el-tools-clean-lint-get-buffer)
@@ -485,7 +508,12 @@ Examples:
       (erase-buffer))))
 
 (defun el-tools-clean-lint-get-buffer ()
-  (get-buffer-create "*Compile-Log*"))
+  (get-buffer-create "*Async Elint*"))
+
+(defun el-tools-clean-lint-append (&rest strings)
+  (let (buffer-read-only)
+    (goto-char (point-max))
+    (apply 'insert strings)))
 
 
 
