@@ -3,6 +3,7 @@
 ;; Author: Hayashi Masahiro <mhayashi1120@gmail.com>
 ;; Keywords: rectangle edit
 ;; URL: http://github.com/mhayashi1120/Emacs-Lisp/raw/master/rect+.el
+;; URL: http://www.emacswiki.org/download/rect+.el
 ;; Emacs: GNU Emacs 21 or later
 
 ;; This program is free software; you can redistribute it and/or
@@ -39,6 +40,16 @@
 ;;     (define-key ctl-x-r-map "\M-l" 'rectplus-downcase-rectangle)
 ;;     (define-key ctl-x-r-map "\M-u" 'rectplus-upcase-rectangle)
 
+;; ********** Emacs 22 or earlier **********
+;;     (require 'gather)
+;;     (global-set-key "\C-xrC" 'rectplus-copy-rectangle)
+;;     (global-set-key "\C-xrN" 'rectplus-insert-number-rectangle)
+;;     (global-set-key "\C-xr\M-c" 'rectplus-create-rectangle-by-regexp)
+;;     (global-set-key "\C-xrA" 'rectplus-append-rectangle-to-eol)
+;;     (global-set-key "\C-xrR" 'rectplus-kill-ring-to-rectangle)
+;;     (global-set-key "\C-xrK" 'rectplus-rectangle-to-kill-ring)
+;;     (global-set-key "\C-xr\M-l" 'rectplus-downcase-rectangle)
+;;     (global-set-key "\C-xr\M-u" 'rectplus-upcase-rectangle)
 
 ;;; Code:
 

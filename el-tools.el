@@ -483,7 +483,7 @@ Examples:
       (setq mode-line-process 
 	    (propertize msg 'face (if (= code 0) 'compilation-info 'compilation-error))))))
 
-;; TODO 22 or 23 not works?
+;; TODO 22 not works?
 (defun el-tools-clean-lint-internal (command file)
   (let* ((path (el-tools-ref file el-tools-clean-lint-path-alist))
 	 (version (el-tools-emacs-version command t))

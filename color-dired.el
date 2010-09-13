@@ -105,17 +105,29 @@
   "Font lock mode face used to highlight changed in last week before."
   :group 'color-dired)
 
-(defvar color-dired-changed-today-face 
-  'color-dired-changed-today-default-face)
+(defcustom color-dired-changed-today-face 
+  'color-dired-changed-today-default-face
+  "Font lock mode face used to highlight changed in this day."
+  :type 'face
+  :group 'color-dired)
 
-(defvar color-dired-changed-this-week-face 
-  'color-dired-changed-this-week-default-face)
+(defcustom color-dired-changed-this-week-face 
+  'color-dired-changed-this-week-default-face
+  "Font lock mode face used to highlight changed in this week."
+  :type 'face
+  :group 'color-dired)
 
-(defvar color-dired-changed-last-week-face 
-  'color-dired-changed-last-week-default-face)
+(defcustom color-dired-changed-last-week-face 
+  'color-dired-changed-last-week-default-face
+  "Font lock mode face used to highlight changed in last week."
+  :type 'face
+  :group 'color-dired)
 
-(defvar color-dired-changed-last-week-before-face 
-  'color-dired-changed-last-week-before-default-face)
+(defcustom color-dired-changed-last-week-before-face 
+  'color-dired-changed-last-week-before-default-face
+  "Font lock mode face used to highlight changed in last week before."
+  :type 'face
+  :group 'color-dired)
 
 (defvar color-dired-last-week-before-regexp nil)
 (defvar color-dired-last-week-regexp nil)

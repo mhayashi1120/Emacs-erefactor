@@ -3,6 +3,7 @@
 ;; Author: Hayashi Masahiro <mhayashi1120@gmail.com>
 ;; Keywords: utility regexp
 ;; URL: http://github.com/mhayashi1120/Emacs-Lisp/raw/master/gather.el
+;; URL: http://www.emacswiki.org/download/gather.el
 ;; Emacs: GNU Emacs 21 or later
 
 ;; This program is free software; you can redistribute it and/or
@@ -40,7 +41,7 @@
 ;;     (define-key ctl-x-r-map "\M-Y" 'gather-matched-insert-with-format)
 ;;     (define-key ctl-x-r-map "v" 'gather-matched-show)
 
-;; ******** Emacs 22 or earlier ***********
+;; ********** Emacs 22 or earlier **********
 ;;     (require 'gather)
 ;;     (global-set-key "\C-xr\M-w" 'gather-matching-kill-save)
 ;;     (global-set-key "\C-xr\C-w" 'gather-matching-kill)
@@ -70,12 +71,12 @@
   "Gather matching regexp save to `gather-killed'.
 Use \\[gather-matched-insert] or \\[gather-matched-insert-with-format] after capture.
 "
-  (interactive (gather-matching-read-args "Regexp: "))
+  (interactive (gather-matching-read-args "Regexp: " nil))
   (gather-matching-do-command regexp nil))
 
 (defun gather-matching-kill (regexp)
   "Same as `gather-matching-kill-save' but delete matched strings."
-  (interactive (gather-matching-read-args "Regexp: "))
+  (interactive (gather-matching-read-args "Regexp: " t))
   (gather-matching-do-command regexp 'erase))
 
 (defun gather-matched-insert (subexp &optional separator)
@@ -179,8 +180,6 @@ digit is replacing to gathered items that is captured by
 	    (setq i (1+ i)))
 	  (setq small-list (nreverse small-list))
 	  (when erase-subexp 
-	    ;;TODO???
-	    (barf-if-buffer-read-only)
 	    (replace-match "" erase-subexp))
 	  (setq return-list 
 		(cons small-list return-list))))
@@ -192,7 +191,9 @@ digit is replacing to gathered items that is captured by
     (setq ring (cons regexp ring))
     (setq gather-matching-regexp-ring ring)))
 
-(defun gather-matching-read-args (prompt)
+(defun gather-matching-read-args (prompt erasep)
+  (when erasep
+    (barf-if-buffer-read-only))
   (let (regexp)
     (setq regexp
 	  (read-from-minibuffer prompt nil nil nil
