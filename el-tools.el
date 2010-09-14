@@ -3,7 +3,7 @@
 ;; Author: Hayashi Masahiro <mhayashi1120@gmail.com>
 ;; Keywords: lisp refactor lint
 ;; URL: http://github.com/mhayashi1120/Emacs-Lisp/raw/master/el-tools.el
-;; URL: http://www.emacswiki.org/download/el-tools.el
+;; URL: http://www.emacswiki.org/cgi-bin/wiki/download/el-tools.el
 ;; Emacs: GNU Emacs 22 or later
 
 ;; This program is free software; you can redistribute it and/or
@@ -121,6 +121,9 @@
 (defun el-tools-refactor-change-prefix-read-args ()
   (refactor-change-prefix-read-args 'el-tools-refactor-read-prefix-history))
 
+;;TODO
+;; (setq hoge (semantic-symref-find-references-by-name "gdic"))
+;; (semantic-symref-result-get-files hoge)
 (defun el-tools-refactor-find-global-binding (symbol)
   (save-excursion
     (goto-char (point-min))
@@ -131,7 +134,7 @@
 	      (while form
 		(when (symbolp (car form))
 		  (setq name (symbol-name (car form)))
-		  ;; todo match colored regexp
+		  ;; todo match colored regexp? like defclass
 		  (when (member name '("defun" "defmacro" "defvar"))
 		    (throw 'found t)))
 		(setq form (cdr form))))
