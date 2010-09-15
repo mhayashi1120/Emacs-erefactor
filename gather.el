@@ -3,7 +3,7 @@
 ;; Author: Hayashi Masahiro <mhayashi1120@gmail.com>
 ;; Keywords: utility regexp
 ;; URL: http://github.com/mhayashi1120/Emacs-Lisp/raw/master/gather.el
-;; URL: http://www.emacswiki.org/cgi-bin/wiki/download/gather.el
+;; URL: http://www.emacswiki.org/emacs/download/gather.el
 ;; Emacs: GNU Emacs 21 or later
 
 ;; This program is free software; you can redistribute it and/or
