@@ -31,6 +31,12 @@
 ;; desired. And put the following expression into your ~/.emacs.
 ;;
 ;;     (require 'color-dired)
+;;
+;; After that, file that is recently changed is emphasized in `dired' buffer.
+;; If you have changed date format in `dired', 
+;; set `color-dired-date-format' like following.
+;; 
+;;     (setq color-dired-date-format "%Y-%m-%d")
 
 ;;; History:
 
@@ -45,9 +51,6 @@
 ;; `color-dired-changed-this-week-face'
 ;; `color-dired-changed-last-week-face'
 ;; `color-dired-changed-last-week-before-face'
-
-;;; TODO:
-;; * (require 'ls-lisp) destroy this feature.
 
 ;;; Code:
 
@@ -141,6 +144,13 @@
 		      (lambda (x) (string-match "^d[[:ascii:]]+$" x))
 		      (split-string (buffer-string)))))
     (setq date (nth 5 template))
+    (unless date
+      ;; for windows.
+      (require 'ls-lisp)
+      (when (fboundp 'ls-lisp-format-time)
+	(let ((string (funcall 'ls-lisp-format-time 
+			       (file-attributes "~/") nil (current-time))))
+	  (setq date (car (split-string string))))))
     (cond
      ((null date)
       "%b %e")
@@ -148,6 +158,8 @@
       "%Y-%m-%d")
      ((string-match "^[0-9]\\{2\\}-[0-9]\\{2\\}-[0-9]\\{2\\}$" date)
       "%y-%m-%d")
+     ((string-match "^[0-9]\\{2\\}-[0-9]\\{2\\}$" date)
+      "%m-%d")
      (t
       "%b %e"))))
 
