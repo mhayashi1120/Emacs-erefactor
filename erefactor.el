@@ -41,11 +41,12 @@
 ;; And set `erefactor-lint-path-alist', `erefactor-lint-by-emacsen'
 
 ;;; Usage:
-;; C-c C-v l : elint current buffer
+;; C-c C-v l : elint current buffer in clean environment.
 ;; C-c C-v L : elint current buffer by multiple emacs binaries.
 ;;             See `erefactor-lint-emacsen'
 ;; C-c C-v r : Rename symbol in current buffer. 
 ;;             Resolve `let' binding as long as i can.
+;; C-c C-v R : Rename symbol in requiring modules and current buffer. 
 
 ;;; TODO:
 ;; * Flymake? Server process?
@@ -61,8 +62,6 @@
 (defvar shell-command-switch)
 (defvar shell-file-name)
 (defvar load-history)
-(defvar isearch-lazy-highlight-last-string)
-(defvar lazy-highlight-cleanup)
 
 (defgroup erefactor nil
   "Emacs Lisp Refactoring utilities"
@@ -108,19 +107,20 @@
     ret))
 
 (defun erefactor--find-local-binding (name)
-  (save-excursion
-    (catch 'found
-      (condition-case err
-          (while t
-            (backward-up-list)
-            (let* ((start (point-marker))
-                   (form (read (current-buffer)))
-                   (end (point-marker)))
-              (when (or
-                     (erefactor--local-binding-p name form)
-                     (erefactor--macroexpand-contains-p name form))
-                (throw 'found (cons start end)))))
-        (scan-error nil)))))
+  (let ((symbol (intern name)))
+    (save-excursion
+      (catch 'found
+        (condition-case err
+            (while t
+              (backward-up-list)
+              (let* ((start (point-marker))
+                     (form (read (current-buffer)))
+                     (end (point-marker)))
+                (when (or
+                       (erefactor--local-binding-p symbol form)
+                       (erefactor--macroexpand-contains-p symbol form))
+                  (throw 'found (cons start end)))))
+          (scan-error nil))))))
 
 (defun erefactor--local-binding-p (name form)
   (or
@@ -132,7 +132,9 @@
    (and (eq (car-safe form) 'lambda)
         (erefactor--lambda-binding-contains-p (cadr form) name))
    (and (eq (car-safe form) 'catch)
-        (erefactor--catch-binding-contains-p (cdr form) name))))
+        (erefactor--catch-binding-contains-p (cdr form) name))
+   (and (eq (car-safe form) 'condition-case)
+        (erefactor--condition-case-contains-p (cdr form) name))))
 
 (defun erefactor--macroexpand-contains-p (name form)
   (when (and (not (memq (car-safe form) '(lambda)))
@@ -158,15 +160,20 @@
      form)
     nil))
 
+(defun erefactor--condition-case-contains-p (form name)
+  (let ((var (car-safe form)))
+    (when (atom var)
+      (eq var name))))
+
 (defun erefactor--let-binding-contains-p (let-arg name)
   (catch 'found
     (mapc
      (lambda (item)
        (when (cond
               ((listp item)
-               (string= (symbol-name (car item)) name))
+               (eq (car item) name))
               ((atom item)
-               (string= (symbol-name item) name)))
+               (eq item name)))
          (throw 'found t)))
      let-arg)
     nil))
@@ -175,7 +182,7 @@
   (catch 'found
     (mapc
      (lambda (item)
-       (when (string= (symbol-name item) name)
+       (when (eq item name)
          (throw 'found t)))
      lambda-arg)
     nil))
@@ -185,9 +192,14 @@
   (and (listp (car catch-arg))
        (eq (caar catch-arg) 'quote)
        (symbolp (cadar catch-arg))
-       (string= (symbol-name (cadar catch-arg)) name)))
+       (eq (cadar catch-arg) name)))
 
 (defun erefactor-rename-symbol-in-package (old-name new-name)
+  "Rename symbol at point with queries. This affect to current buffer and requiring modules.
+
+Please remember, this function only works well if 
+the module have observance of `require'/`provide' system.
+"
   (interactive 
    (erefactor-rename-symbol-read-args 'erefactor--read-symbol-history))
   (let* ((symbol (intern-soft old-name))
@@ -202,7 +214,8 @@
      guessed-files)))
 
 (defun erefactor-rename-symbol-in-buffer (old-name new-name)
-  "Rename symbol at point."
+  "Rename symbol at point resolving reference local variable as long as i can with queries.
+This affect to current buffer."
   (interactive 
    (erefactor-rename-symbol-read-args 'erefactor--read-symbol-history))
   (let (region after)
@@ -212,7 +225,12 @@
     (erefactor-rename-region old-name new-name region nil after)))
 
 (defun erefactor-change-prefix-in-buffer (old-prefix new-prefix)
-  "Rename symbol at point."
+  "Rename symbol prefix with queries.
+
+OLD-PREFIX: `foo-' -> NEW-PREFIX: `baz-'
+`foo-function1' -> `baz-function1'
+`foo-variable1' -> `baz-variable1'
+"
   (interactive 
    (erefactor-change-prefix-read-args 'erefactor--read-prefix-history))
   (erefactor-change-symbol-prefix old-prefix new-prefix 
@@ -326,19 +344,35 @@
   "Dehighlight `erefactor-highlight'."
   (when erefactor--overlay
     (delete-overlay erefactor--overlay))
-  (lazy-highlight-cleanup lazy-highlight-cleanup)
-  (setq isearch-lazy-highlight-last-string nil))
+  (erefactor-dehighlight-all))
 
 (defun erefactor-highlight (string beg fin)
   "Highlight STRING between BEG and FIN."
   (setq erefactor--overlay (make-overlay beg fin))
   (overlay-put erefactor--overlay 'priority 1001) ;higher than lazy overlays
   (overlay-put erefactor--overlay 'face 'query-replace)
-  (let ((isearch-string string)
+  (erefactor-highlight-update-region
+   erefactor--region-start erefactor--region-end
+   string))
+
+(defvar isearch-lazy-highlight-last-string)
+(defvar lazy-highlight-cleanup)
+
+(defun erefactor-highlight-update-region (start end regexp)
+  (let ((isearch-string regexp)
         (isearch-regexp t)
         (search-whitespace-regexp nil)
         (isearch-case-fold-search nil))
-    (isearch-lazy-highlight-new-loop erefactor--region-start erefactor--region-end)))
+    (save-excursion
+      (unless (looking-at "\\_<")
+        (condition-case nil
+            (backward-sexp)
+          (scan-error nil)))
+      (isearch-lazy-highlight-new-loop start end))))
+
+(defun erefactor-dehighlight-all ()
+  (lazy-highlight-cleanup lazy-highlight-cleanup)
+  (setq isearch-lazy-highlight-last-string nil))
 
 (defmacro erefactor-with-file (file &rest form)
   (declare (indent 1))
@@ -447,21 +481,30 @@ Optional arg AFTER-FUNC is called with two args old-name and new-name after repl
 
 (defun erefactor-highlight-current-symbol ()
   (interactive)
-  (let ((symbol (thing-at-point 'symbol))
-        region start end)
-    (setq region (erefactor--find-local-binding symbol))
-    (setq start (if region (car region) (point-min)))
-    (setq end (if region (cdr region) (save-excursion (goto-char (point-max)) (point-marker))))
-    (let ((isearch-string (erefactor-create-regexp symbol))
-          (isearch-regexp t)
-          (search-whitespace-regexp nil)
-          (isearch-case-fold-search nil))
-      (isearch-lazy-highlight-new-loop start end))))
+  (let ((symbol (thing-at-point 'symbol)))
+    (unless symbol
+      (erefactor-dehighlight-all)
+      (error "No symbol at point"))
+    (let* ((region (erefactor--find-local-binding symbol))
+           (start (if region (car region) (point-min)))
+           (end (if region (cdr region) (point-max))))
+      (erefactor-highlight-update-region 
+       start end (erefactor-create-regexp symbol)))))
 
 (defun erefactor-dehighlight-symbol ()
   (interactive)
-  (lazy-highlight-cleanup lazy-highlight-cleanup)
-  (setq isearch-lazy-highlight-last-string nil))
+  (erefactor-dehighlight-all))
+
+(defun erefactor-lazy-highlight-local-symbol ()
+  (let ((symbol (thing-at-point 'symbol)))
+    (if symbol
+        (let ((region (erefactor--find-local-binding symbol)))
+          (if region
+              (erefactor-highlight-update-region 
+               (car region) (cdr region)
+               (erefactor-create-regexp symbol))
+            (erefactor-dehighlight-all)))
+      (erefactor-dehighlight-all))))
 
 
 
@@ -606,15 +649,43 @@ Examples:
 (unless erefactor-map
   (let ((map (make-sparse-keymap)))
 
-    (define-key map "R" 'erefactor-rename-symbol-in-package)
-    (define-key map "r" 'erefactor-rename-symbol-in-buffer)
-    (define-key map "c" 'erefactor-change-prefix-in-buffer)
-    (define-key map "h" 'erefactor-highlight-current-symbol)
-    (define-key map "d" 'erefactor-dehighlight-symbol)
-    (define-key map "l" 'erefactor-lint)
     (define-key map "L" 'erefactor-lint-by-emacsen)
+    (define-key map "R" 'erefactor-rename-symbol-in-package)
+    (define-key map "c" 'erefactor-change-prefix-in-buffer)
+    (define-key map "d" 'erefactor-dehighlight-symbol)
+    (define-key map "h" 'erefactor-highlight-current-symbol)
+    (define-key map "l" 'erefactor-lint)
+    (define-key map "r" 'erefactor-rename-symbol-in-buffer)
 
     (setq erefactor-map map)))
+
+
+
+;;
+;; unit test
+;;
+
+(dont-compile
+  (when (fboundp 'expectations)
+
+    (expectations 
+     (expect t (erefactor--local-binding-p 'v '(defun f (v))))
+     (expect t (erefactor--local-binding-p 'v '(lambda (v))))
+     (expect t (erefactor--local-binding-p 'v '(let ((v v1)))))
+     (expect t (erefactor--local-binding-p 'tag '(catch 'tag)))
+
+     (expect nil (erefactor--local-binding-p 'v '(defun f (v1) v)))
+     (expect nil (erefactor--local-binding-p 'v '(lambda (v1) v)))
+     (expect nil (erefactor--local-binding-p 'v '(let ((v1 val)) v)))
+     (expect nil (erefactor--local-binding-p 'tag '(catch 'tag1 tag)))
+
+     (expect t (erefactor--macroexpand-contains-p 'v '(defun* f (v))))
+     (expect nil (erefactor--macroexpand-contains-p 'v '(defun* f (v1) v)))
+     )))
+
+;; (expectations-execute)
+
+
 
 (provide 'erefactor)
 
