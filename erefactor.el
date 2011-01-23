@@ -2,7 +2,7 @@
 
 ;; Author: Hayashi Masahiro <mhayashi1120@gmail.com>
 ;; Keywords: lisp refactor lint
-;; URL: http://github.com/mhayashi1120/Emacs-gosh-mode/raw/master/erefactor.el
+;; URL: http://github.com/mhayashi1120/Emacs-erefactor/raw/master/erefactor.el
 ;; URL: http://www.emacswiki.org/emacs/download/erefactor.el
 ;; Emacs: GNU Emacs 22 or later
 
