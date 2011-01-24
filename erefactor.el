@@ -79,6 +79,10 @@
 (defvar shell-command-switch)
 (defvar shell-file-name)
 (defvar load-history)
+(defvar idle-update-delay) ;; after Emacs 22
+(defvar this-command)
+(defvar timer-idle-list)
+(defvar current-prefix-arg)
 
 (defgroup erefactor nil
   "Emacs Lisp Refactoring utilities"
