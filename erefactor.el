@@ -54,7 +54,8 @@
 ;; C-c C-v r : Rename symbol in current buffer. 
 ;;             Resolve `let' binding as long as i can.
 ;; C-c C-v R : Rename symbol in requiring modules and current buffer. 
-;; C-c C-v h : Highlight current symbol in this buffer.
+;; C-c C-v h : Highlight current symbol in this buffer
+;;             and suppress `erefacthr-highlight-mode'.
 ;; C-c C-v d : Dehighlight all by above command.
 ;; C-c C-v c : Switch prefix bunch of symbols. 
 ;;             ex: '(hoge-var hoge-func) -> '(foo-var foo-func)
@@ -62,6 +63,10 @@
 ;;; TODO:
 ;; * Flymake? Server process?
 ;; * Change only same case if symbol. But docstring is not.
+;; * `.' is not a separator of lisp symbol.
+;;   rename `region' and `REGION.' in docstring
+;;   don't use re-search while idiom, 
+;;   gather symbols in code, string, comment each context.
 
 ;;; Code:
 
@@ -80,7 +85,6 @@
   :group 'lisp
   :prefix "erefactor-")
 
-
 (defvar erefactor--read-symbol-history nil)
 (defvar erefactor--read-prefix-history nil)
 
@@ -180,22 +184,28 @@
         (erefactor--lambda-binding-contains-p (caddr form) name))
    (and (eq (car-safe form) 'lambda)
         (erefactor--lambda-binding-contains-p (cadr form) name))
+   (and (eq (car-safe form) 'defadvice)
+        (erefactor--defadvice-binding-contains-p (caddr form) name))
    (and (eq (car-safe form) 'catch)
         (erefactor--catch-binding-contains-p (cdr form) name))
    (and (eq (car-safe form) 'condition-case)
-        (erefactor--condition-case-contains-p (cdr form) name))))
+        (erefactor--condition-case-contains-p (cdr form) name))
+   (and (eq (car-safe form) 'eieio-defmethod)
+        (erefactor--eieio-defmethod-contains-p (caadr (caddr form)) name))))
 
 (defun erefactor--macroexpand-contains-p (name form)
   ;; `lambda' is macro expanded like (function (lambda () ...))
   (when (and (not (memq (car-safe form) '(lambda))) 
              (erefactor-macrop (car-safe form)))
-    (let ((expand-form (macroexpand form)))
-      (catch 'found
-        (when (erefactor--local-binding-p name expand-form)
-          (throw 'found t))
-        (when (erefactor--binding-exists-p name expand-form)
-          (throw 'found t))
-        nil))))
+    (condition-case nil
+        (let ((expand-form (macroexpand form)))
+          (catch 'found
+            (when (erefactor--local-binding-p name expand-form)
+              (throw 'found t))
+            (when (erefactor--binding-exists-p name expand-form)
+              (throw 'found t))
+            nil))
+      (error nil))))
 
 (defun erefactor--binding-exists-p (name form)
   (catch 'found
@@ -217,26 +227,25 @@
       (eq var name))))
 
 (defun erefactor--let-binding-contains-p (let-arg name)
-  (catch 'found
-    (mapc
-     (lambda (item)
-       (when (cond
-              ((listp item)
-               (eq (car item) name))
-              ((atom item)
-               (eq item name)))
-         (throw 'found t)))
-     let-arg)
-    nil))
+  (or (memq name let-arg)
+      (assq name let-arg)))
 
 (defun erefactor--lambda-binding-contains-p (lambda-arg name)
-  (catch 'found
-    (mapc
-     (lambda (item)
-       (when (eq item name)
-         (throw 'found t)))
-     lambda-arg)
-    nil))
+  (and (not (memq name '(&optional &rest)))
+       (memq name lambda-arg)))
+
+(defun erefactor--eieio-defmethod-contains-p (method-arg name)
+  (and (not (memq name '(&optional &rest)))
+       (or (memq name method-arg)
+           (assq name method-arg))))
+
+(defun erefactor--defadvice-binding-contains-p (ad-args name)
+  (let* ((rest (cddr ad-args))
+         ;; consider optional position arg
+         (args (if (consp (car rest)) 
+                   (car rest)
+                 (cadr rest))))
+    (erefactor--lambda-binding-contains-p args name)))
 
 (defun erefactor--catch-binding-contains-p (catch-arg name)
   "Consider (catch variable ...) like form."
@@ -269,8 +278,8 @@ the module have observance of `require'/`provide' system.
 This affect to current buffer."
   (interactive 
    (erefactor-rename-symbol-read-args 'erefactor--read-symbol-history))
-  (let (region after)
-    (setq region (erefactor--find-local-binding old-name))
+  (let ((region (erefactor--find-local-binding old-name))
+        after)
     (unless region
       (setq after 'erefactor-after-rename-symbol))
     (erefactor-rename-region old-name new-name region nil after)))
@@ -287,11 +296,11 @@ OLD-PREFIX: `foo-' -> NEW-PREFIX: `baz-'
   (erefactor-change-symbol-prefix old-prefix new-prefix 
                                   nil 'erefactor-after-rename-symbol))
 
-;; (defun erefactor-before-rename-symbol (old-name new-name)
+;; (defun erefactor-before-rename-symbol (old-name captured new-name)
 ;;   (cond
 ;;    ((erefactor-context-code-p)
 ;;     ;; ignore if case is different
-;;     (when (string= old-name new-name)
+;;     (when (string= old-name captured)
 ;;       (y-or-n-p "Rename? ")))
 ;;    (t
 ;;     (y-or-n-p "Replace? "))))
@@ -381,8 +390,6 @@ OLD-PREFIX: `foo-' -> NEW-PREFIX: `baz-'
                      collect def)
           collect (car defs))))
 
-
-
 (defvar erefactor--overlay nil)
 (defvar erefactor--region-start nil)
 (defvar erefactor--region-end nil)
@@ -407,6 +414,7 @@ OLD-PREFIX: `foo-' -> NEW-PREFIX: `baz-'
   "SYMBOL is already bounded or not in region START END."
   (save-excursion
     (goto-char start)
+    ;; search only symbol. (if possible...)
     (let (case-fold-search)
       (and (re-search-forward (erefactor-create-regexp symbol) nil t)
            (< (point) end)))))
@@ -440,15 +448,7 @@ OLD-PREFIX: `foo-' -> NEW-PREFIX: `baz-'
    regexp t))
 
 (defface erefactor-highlight-face
-  '((((class color) (min-colors 88) (background light))
-     (:background "yellow2"))
-    (((class color) (min-colors 88) (background dark))
-     (:background "LightYellow4"))
-    (((class color) (min-colors 16))
-     (:background "yellow3"))
-    (((class color) (min-colors 8))
-     (:background "yellow3"))
-    (t (:underline t)))
+  '((t (:inherit match)))
   "Face for highlighting of matches."
   :group 'erefactor)
 
@@ -496,10 +496,10 @@ CHECK is function that accept no arg and return boolean."
            (unless (buffer-modified-p buffer)
              (kill-buffer buffer)))))))
 
-(defun erefactor--call-before (func old-name new-name)
+(defun erefactor--call-before (func old-name capture new-name)
   (save-match-data
     (if func 
-        (funcall func old-name new-name)
+        (funcall func old-name capture new-name)
       (y-or-n-p "Rename? "))))
 
 (defun erefactor--call-after (func old-name new-name)
@@ -509,12 +509,12 @@ CHECK is function that accept no arg and return boolean."
 
 (defun erefactor-rename-region (symbol new-symbol &optional region before-func after-func)
   "Rename SYMBOL to NEW-SYMBOL in REGION.
-Optional arg BEFORE-FUNC is called with two args SYMBOL and NEW-SYMBOL before replacing.
-  This function must return non-nil value if executing replacing.
-Optional arg AFTER-FUNC is called with two args SYMBOL and NEW-SYMBOL after replaced.
-"
+Optional arg BEFORE-FUNC is not used currently (TODO). 
+    But called with three args SYMBOL and NEW-SYMBOL before replacing.
+    This function must return non-nil value if executing to replace.
+Optional arg AFTER-FUNC is called with two args SYMBOL and NEW-SYMBOL after replaced."
   (let ((start (if region (car region) (point-min)))
-        (end (save-excursion 
+        (end (save-excursion
                (goto-char (if region (cdr region) (point-max)))
                (point-marker)))
         regexp)
@@ -528,20 +528,21 @@ Optional arg AFTER-FUNC is called with two args SYMBOL and NEW-SYMBOL after repl
         ;; cannot use narrow-to-region because is unnatural while interactive loop
         (while (and (re-search-forward regexp nil t)
                     (< (point) end))
-          (goto-char (match-end 1))
-          (erefactor-re-highlight-in-interactive regexp (match-beginning 1) (match-end 1))
-          (unwind-protect
-              (when (erefactor--call-before before-func symbol new-symbol)
-                (replace-match new-symbol nil nil nil 1)
-                (erefactor--call-after after-func symbol new-symbol))
-            (erefactor-dehighlight-in-interactive)))))))
+          (let ((target (match-string 0)))
+            (goto-char (match-end 1))
+            (erefactor-re-highlight-in-interactive regexp (match-beginning 1) (match-end 1))
+            (unwind-protect
+                (when (erefactor--call-before before-func symbol target new-symbol)
+                  (replace-match new-symbol nil nil nil 1)
+                  (erefactor--call-after after-func symbol new-symbol))
+              (erefactor-dehighlight-in-interactive))))))))
 
 (defun erefactor-change-symbol-prefix (prefix new-prefix &optional before-func after-func)
-  "Switch symbol PREFIX to NEW-PREFIX in REGION.
-Optional arg BEFORE-FUNC is called with two args old-name and new-name before replacing.
-  This function must return non-nil value if executing replacing.
-Optional arg AFTER-FUNC is called with two args old-name and new-name after replaced.
-"
+  "Switch symbol PREFIX to NEW-PREFIX in buffer.
+Optional arg BEFORE-FUNC is not used currently (TODO). 
+    But called with three args SYMBOL and NEW-SYMBOL before replacing.
+    This function must return non-nil value if executing to replace.
+Optional arg AFTER-FUNC is called with two args old-name and new-name after replaced."
   (save-excursion
     (setq erefactor--region-start (point-min))
     (setq erefactor--region-end (point-max))
@@ -551,11 +552,12 @@ Optional arg AFTER-FUNC is called with two args old-name and new-name after repl
       (while (re-search-forward regexp nil t)
         (goto-char (match-end 1))
         (erefactor-re-highlight-in-interactive regexp (match-beginning 2) (match-end 2))
-        (let* ((suffix (match-string 3))
+        (let* ((target (match-string 0))
+               (suffix (match-string 3))
                (old-name (concat prefix suffix))
                (new-name (concat new-prefix suffix)))
           (unwind-protect
-              (when (erefactor--call-before before-func old-name new-name)
+              (when (erefactor--call-before before-func old-name target new-name)
                 (replace-match new-prefix nil nil nil 2)
                 (erefactor--call-after after-func old-name new-name))
             (erefactor-dehighlight-in-interactive)))))))
@@ -590,20 +592,16 @@ Force to dehighlight \\[erefactor-dehighlight-all-symbol]"
     (erefactor-dehighlight-all)
     (unless symbol
       (error "No symbol at point"))
-    (let* ((region (erefactor--find-local-binding symbol))
-           (start (if region (car region) (point-min)))
-           (end (if region (cdr region) (point-max))))
-      (erefactor-highlight-update-region 
-       start end (erefactor-create-regexp symbol))
-      (setq erefactor-lazy-highlight-previous (point)))))
+    (erefactor-highlight-update-region 
+     (point-min) (point-max) (erefactor-create-regexp symbol))
+    (erefactor-lazy-highlight-suspend)))
 
 (defun erefactor-dehighlight-all-symbol ()
   "Dehighlight the all highlighted symbols in this buffer."
   (interactive)
   (erefactor-dehighlight-all)
-  (setq erefactor-lazy-highlight-previous nil))
+  (erefactor-lazy-highlight-resume))
 
-
 ;;
 ;; experimental
 ;;
@@ -614,23 +612,29 @@ In highlight mode, the highlight the current symbol if recognize as a local vari
 "
   :group 'erefactor
   (if erefactor-highlight-mode
-      (erefactor-lazy-highlight-start)
-    (erefactor-lazy-highlight-stop)
-    (erefactor-lazy-dehighlight-local-symbol)))
+      (erefactor-lazy-highlight--start)
+    (erefactor-lazy-highlight--stop)
+    (erefactor-lazy-highlight--dehihglight)))
 
 (defun erefactor-lazy-highlight-turn-on ()
   (erefactor-highlight-mode 1))
 
-(defvar erefactor-lazy-highlight-timer nil)
+(defun erefactor-lazy-highlight-suspend ()
+  (setq erefactor-lazy-highlight--previous t))
+
+(defun erefactor-lazy-highlight-resume ()
+  (setq erefactor-lazy-highlight--previous nil))
+
+(defvar erefactor-lazy-highlight--timer nil)
 
 ;;FIXME if highlight current symbol 
 ;; -> change symbol name
 ;; -> quickly back to highlighted point
-(defvar erefactor-lazy-highlight-previous nil)
-(make-variable-buffer-local 'erefactor-lazy-highlight-previous)
+(defvar erefactor-lazy-highlight--previous nil)
+(make-variable-buffer-local 'erefactor-lazy-highlight--previous)
 
-(defun erefactor-lazy-highlight-stop ()
-  (when erefactor-lazy-highlight-timer
+(defun erefactor-lazy-highlight--stop ()
+  (when erefactor-lazy-highlight--timer
     (unless (catch 'found
               (mapc
                (lambda (buf)
@@ -639,33 +643,35 @@ In highlight mode, the highlight the current symbol if recognize as a local vari
                      (throw 'found t))))
                (buffer-list))
               nil)
-      (cancel-timer erefactor-lazy-highlight-timer)
-      (setq erefactor-lazy-highlight-timer nil))))
+      (cancel-timer erefactor-lazy-highlight--timer)
+      (setq erefactor-lazy-highlight--timer nil))))
 
-(defun erefactor-lazy-highlight-start ()
+(defun erefactor-lazy-highlight--start ()
   (or
-   (and erefactor-lazy-highlight-timer
-        (memq erefactor-lazy-highlight-timer timer-idle-list))
-   (setq erefactor-lazy-highlight-timer
+   (and erefactor-lazy-highlight--timer
+        (memq erefactor-lazy-highlight--timer timer-idle-list))
+   (setq erefactor-lazy-highlight--timer
          (run-with-idle-timer idle-update-delay t 
-                              'erefactor-lazy-highlight-local-symbol))))
+                              'erefactor-lazy-highlight--highlight))))
 
-(defun erefactor-lazy-dehighlight-local-symbol ()
+(defun erefactor-lazy-highlight--dehihglight ()
   (erefactor-dehighlight-all)
-  (setq erefactor-lazy-highlight-previous nil))
+  (setq erefactor-lazy-highlight--previous nil))
 
-(defun erefactor-lazy-highlight-local-symbol ()
+(defun erefactor-lazy-highlight--highlight ()
   (condition-case nil
       (cond
        ;; ignore when other command executing.
-       ;; ex: edebug, erefactor-rename-symbol-*
+       ;; ex: erefactor-rename-symbol-*
        (this-command)
        ((not erefactor-highlight-mode))
-       ((and erefactor-lazy-highlight-previous 
-             (= erefactor-lazy-highlight-previous (point))))
+       ;; t means suppress lazy highlight
+       ((eq erefactor-lazy-highlight--previous t))
+       ((and erefactor-lazy-highlight--previous 
+             (= erefactor-lazy-highlight--previous (point))))
        (t
-        (erefactor-lazy-dehighlight-local-symbol)
-        (setq erefactor-lazy-highlight-previous (point)) ;; save point
+        (erefactor-lazy-highlight--dehihglight)
+        (setq erefactor-lazy-highlight--previous (point)) ;; save point
         (let ((symbol (thing-at-point 'symbol)))
           (when symbol
             (let ((region (erefactor--find-local-binding symbol)))
@@ -676,8 +682,6 @@ In highlight mode, the highlight the current symbol if recognize as a local vari
                  nil 'erefactor-context-code-p)))))))
     ;; completely ignore all errors
     (error nil)))
-
-
 
 (defcustom erefactor-lint-emacsen nil
   "*Emacs executables.
@@ -796,8 +800,6 @@ See variable `erefactor-lint-emacsen'."
     (goto-char (point-max))
     (apply 'insert strings)))
 
-
-
 (defun erefactor-macrop (symbol)
   (and 
    (symbolp symbol)
@@ -817,8 +819,6 @@ See variable `erefactor-lint-emacsen'."
           (string-to-number (match-string 1 output))
         (match-string 0 output)))))
 
-
-
 (defvar erefactor-map nil)
 
 (unless erefactor-map
@@ -833,8 +833,6 @@ See variable `erefactor-lint-emacsen'."
     (define-key map "r" 'erefactor-rename-symbol-in-buffer)
 
     (setq erefactor-map map)))
-
-
 
 ;;
 ;; unit test
@@ -858,12 +856,13 @@ See variable `erefactor-lint-emacsen'."
      (expect t (erefactor--macroexpand-contains-p 'k1 '(defun* f (v1 &key k1))))
      (expect nil (erefactor--macroexpand-contains-p 'v '(defun* f (v1) v)))
 
+     ;; check ignoring failed (defface) form expansion
+     (expect nil (erefactor--macroexpand-contains-p 'v1 '(when test (case v1 (defface)))))
+
      ;; cannot test `erefactor--local-fbinding' because that move point.
      )))
 
 ;; (expectations-execute)
-
-
 
 (provide 'erefactor)
 
