@@ -62,11 +62,25 @@
 
 ;;; TODO:
 ;; * Flymake? Server process?
+;;
 ;; * Change only same case if symbol. But docstring is not.
+;;
 ;; * `.' is not a separator of lisp symbol.
-;;   rename `region' and `REGION.' in docstring
+;;   rename `region' symbol and `REGION.' in docstring
 ;;   don't use re-search while idiom, 
 ;;   gather symbols in code, string, comment each context.
+;; (defun hoge (region)
+;;   "REGION is REGION."
+;;   region)
+;;
+;; * macroexpand misunderstand local variable
+;;
+;; (defmacro hogemacro (&rest form)
+;;   `(progn
+;;      ,@form
+;;      (let (a))))
+;; =>
+;; (hogemacro a) <= `a' is not bounded in this context.
 
 ;;; Code:
 
@@ -274,7 +288,9 @@ the module have observance of `require'/`provide' system.
     (mapc
      (lambda (file)
        (erefactor-with-file file
-         (erefactor-rename-symbol-in-buffer old-name new-name)))
+         (erefactor-rename-region 
+          old-name new-name nil nil
+          'erefactor-after-rename-symbol)))
      guessed-files)))
 
 (defun erefactor-rename-symbol-in-buffer (old-name new-name)
