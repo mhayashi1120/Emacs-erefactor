@@ -817,8 +817,6 @@ See variable `erefactor-lint-emacsen'."
 ;;
 ;; flymake (experimental)
 ;;
-;;TODO display errors to buffer
-;;TODO create temp file.
 
 (require 'flymake nil t)
 
@@ -869,7 +867,6 @@ See variable `erefactor-lint-emacsen'."
 (defvar erefactor-flymake-temp-file nil)
 (defconst erefactor-flymake-error-buffer-name " *Erefactor errors* ")
 
-;;TODO
 (defun erefactor-flymake-display-errors ()
   (interactive)
   (if (not (erefactor-flymake-have-errs-p))
