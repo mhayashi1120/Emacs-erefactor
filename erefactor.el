@@ -59,10 +59,9 @@
 ;; C-c C-v d : Dehighlight all by above command.
 ;; C-c C-v c : Switch prefix bunch of symbols. 
 ;;             ex: '(hoge-var hoge-func) -> '(foo-var foo-func)
+;; C-c C-v ? : Display flymake elint warnings/errors
 
 ;;; TODO:
-;; * Flymake? Server process?
-;;
 ;; * Change only same case if symbol. But docstring is not.
 ;;
 ;; * `.' is not a separator of lisp symbol.
@@ -81,6 +80,10 @@
 ;;      (let (a))))
 ;; =>
 ;; (hogemacro a) <= `a' is not bounded in this context.
+;;
+;; * Devide to other elisp file about elint and flymake
+;;
+;; * flymake not works emacs-22
 
 ;;; Code:
 
@@ -147,7 +150,7 @@
          previous)
     (save-excursion
       (catch 'found
-        (condition-case err
+        (condition-case nil
             (while t
               (backward-up-list)
               (let* ((start (point-marker))
@@ -621,7 +624,7 @@ Force to dehighlight \\[erefactor-dehighlight-all-symbol]"
   (erefactor-dehighlight-all))
 
 ;;
-;; experimental
+;; lazy highlight local variable
 ;;
 
 (define-minor-mode erefactor-highlight-mode
@@ -629,10 +632,15 @@ Force to dehighlight \\[erefactor-dehighlight-all-symbol]"
 In highlight mode, the highlight the current symbol if recognize as a local variable.
 "
   :group 'erefactor
-  (if erefactor-highlight-mode
-      (erefactor-lazy-highlight--start)
+  (cond
+   (erefactor-highlight-mode
+    (erefactor-lazy-highlight--start)
+    ;; TODO suppress auto-highlight
+    (set (make-local-variable 'ahs-face-check-include-overlay) t))
+   (t
     (erefactor-lazy-highlight--stop)
-    (erefactor-lazy-highlight--dehihglight)))
+    (erefactor-lazy-highlight--dehihglight)
+    (kill-local-variable 'ahs-face-check-include-overlay))))
 
 (defun erefactor-lazy-highlight-turn-on ()
   (erefactor-highlight-mode 1))
@@ -760,33 +768,17 @@ See variable `erefactor-lint-emacsen'."
     (let* ((code (process-exit-status process))
            (msg  (format " (Exit [%d])" code)))
       (setq mode-line-process 
-            (propertize msg 'face (if (= code 0) 'compilation-info 'compilation-error))))))
+            (propertize msg 'face 
+                        (if (= code 0) 'compilation-info 'compilation-error))))))
 
 (defun erefactor-lint-internal (command file)
-  (let* ((path (erefactor-ref file erefactor-lint-path-alist))
-         (version (erefactor-emacs-version command t))
-         (sexp `(progn 
-                  (setq load-path (append load-path ',path)) 
-                  (find-file ,file)
-                  ;;FIXME probablly ok...
-                  ,(when (<= version 23)
-                     '(eval-buffer))
-                  (elint-initialize)
-                  (elint-current-buffer)
-                  (with-current-buffer "*Elint*"
-                    (princ (buffer-string)))))
-         (eval-form (prin1-to-string sexp))
-         (buffer (erefactor-lint-get-buffer))
-         cmdline)
-    (setq eval-form (replace-regexp-in-string "\n" " " eval-form))
-    (setq eval-form (replace-regexp-in-string "\"" "\\\\\"" eval-form))
-    (setq cmdline (format "%s -batch -eval \"%s\"" command eval-form))
+  (let* ((args (erefactor-lint-command-args command file))
+         (buffer (erefactor-lint-get-buffer)))
     (display-buffer buffer)
     (with-current-buffer buffer
       (erefactor-lint-append (format "----- Linting by %s -----\n" command))
-      (let ((proc (start-process "Clean Lint" (current-buffer) 
-                                 shell-file-name shell-command-switch
-                                 cmdline)))
+      (let ((proc (apply 'start-process "Async Elint" (current-buffer) 
+                         command args)))
         (set-process-sentinel proc (lambda (p e)))
         (setq mode-line-process (propertize " (Running)" 'face 'compilation-warning))
         proc))))
@@ -797,6 +789,23 @@ See variable `erefactor-lint-emacsen'."
           buffer-read-only)
       (erase-buffer))))
 
+(defun erefactor-lint-command-args (command file &optional temp-file)
+  (let* ((path (erefactor-ref file erefactor-lint-path-alist))
+         (version (erefactor-emacs-version command t))
+         (sexp `(progn 
+                  (setq load-path (append load-path ',path)) 
+                  (find-file ,(or temp-file file))
+                  ;;FIXME security risk?
+                  ;; (eval-buffer)
+                  (elint-initialize)
+                  (elint-current-buffer)
+                  (with-current-buffer "*Elint*"
+                    (princ (buffer-string)))))
+         (eval-form (prin1-to-string sexp))
+         (buffer (erefactor-lint-get-buffer))
+         cmdline)
+    (list "-batch" "-eval" eval-form)))
+
 (defun erefactor-lint-get-buffer ()
   (get-buffer-create "*Async Elint*"))
 
@@ -804,6 +813,104 @@ See variable `erefactor-lint-emacsen'."
   (let (buffer-read-only)
     (goto-char (point-max))
     (apply 'insert strings)))
+
+;;
+;; flymake (experimental)
+;;
+;;TODO display errors to buffer
+;;TODO create temp file.
+
+(require 'flymake nil t)
+
+(defconst erefactor-flymake-allowed-file-name-masks
+  '("\\.el$" erefactor-flymake-init erefactor-flymake-cleanup 
+    erefactor-flymake-get-real-file-name))
+
+(defconst erefactor-flymake-error-line-patterns
+  '("^\\([^:]+\\.el\\):\\([0-9]+\\):\\([0-9]+\\):[ ]*\\(.+\\)" 1 2 3 4))
+
+(when (boundp 'flymake-allowed-file-name-masks)
+  (add-to-list 'flymake-allowed-file-name-masks 
+               erefactor-flymake-allowed-file-name-masks))
+
+(when (boundp 'flymake-err-line-patterns)
+  (add-to-list 'flymake-err-line-patterns 
+               erefactor-flymake-error-line-patterns))
+
+(defun erefactor-flymake-cleanup ()
+  (flymake-safe-delete-file erefactor-flymake-temp-file)
+  (setq flymake-last-change-time nil))
+
+(defun erefactor-flymake-get-real-file-name (name)
+  (or
+   (loop with temp-name = name
+         for b in (buffer-list)
+         when (let ((value (buffer-local-value 'erefactor-flymake-temp-file b)))
+                (and value
+                     (string= temp-name (file-name-nondirectory value))))
+         return (buffer-file-name b))
+   (buffer-file-name)))
+
+(defun erefactor-flymake-init ()
+  (unless erefactor-flymake-temp-file
+    (set (make-local-variable 'erefactor-flymake-temp-file)
+         ;; match to `erefactor-flymake-error-line-patterns'
+         (concat (make-temp-file "erefactor-") ".el")))
+  (let ((file (buffer-file-name))
+        (command (expand-file-name (invocation-name) (invocation-directory)))
+        temp-file)
+    (when (buffer-modified-p)
+      (let ((coding-system-for-write buffer-file-coding-system))
+        (write-region (point-min) (point-max) erefactor-flymake-temp-file nil 'no-msg)
+        (setq temp-file erefactor-flymake-temp-file)))
+    (list command
+          (erefactor-lint-command-args command file temp-file))))
+
+(defvar erefactor-flymake-temp-file nil)
+(defconst erefactor-flymake-error-buffer-name " *Erefactor errors* ")
+
+;;TODO
+(defun erefactor-flymake-display-errors ()
+  (interactive)
+  (if (not (erefactor-flymake-have-errs-p))
+      (message "No errors or warnings")
+    (let ((buf (get-buffer-create erefactor-flymake-error-buffer-name))
+	  (title (erefactor-flymake-err-title))
+	  (errs (erefactor-flymake-err-list)))
+      (with-current-buffer buf
+	(erase-buffer)
+	(erefactor-flymake-insert-errors title errs))
+      (save-window-excursion
+        (display-buffer buf)
+        (let ((event (read-event)))
+          (setq unread-command-events (list event)))))))
+
+(defun erefactor-flymake-insert-errors (title errs)
+  (save-excursion
+    (insert title "\n\n")
+    (mapc 
+     (lambda (x) (insert x "\n"))
+     errs)))
+
+(defun erefactor-flymake-err-get-title (x) (nth 0 x))
+(defun erefactor-flymake-err-get-errs (x) (nth 1 x))
+
+(defalias 'erefactor-flymake-have-errs-p 'erefactor-flymake-data)
+
+(defun erefactor-flymake-data ()
+  (let* ((line-no (flymake-current-line-no))
+         (info (nth 0 (flymake-find-err-info flymake-err-info line-no))))
+    (flymake-make-err-menu-data line-no info)))
+
+(defun erefactor-flymake-err-title ()
+  (erefactor-flymake-err-get-title (erefactor-flymake-data)))
+
+(defun erefactor-flymake-err-list ()
+  (mapcar 'car (erefactor-flymake-err-get-errs (erefactor-flymake-data))))
+
+;;
+;; utilities
+;;
 
 (defun erefactor-macrop (symbol)
   (and 
@@ -818,28 +925,24 @@ See variable `erefactor-lint-emacsen'."
   (with-temp-buffer
     (call-process command nil (current-buffer) nil "-version")
     (let ((output (buffer-string)))
-      (unless (string-match "\\(2[0-9]\\)\\.[0-9]+\\.[0-9]+" output)
+      (unless (string-match "Emacs *\\(\\([0-9]+\\)\\.[0-9]+\\.[0-9]+\\)" output)
         (error "Unable get version"))
       (if major-only
-          (string-to-number (match-string 1 output))
-        (match-string 0 output)))))
+          (string-to-number (match-string 2 output))
+        (match-string 1 output)))))
+
+(defun erefactor-mapconcat (func list)
+  (apply 'append (mapcar func list)))
 
 ;;
 ;; other elisp compatibility
 ;;
 
-;; adhoc solution..
-(require 'advice)
-(defadvice ahs-dropdown-list-p 
-  (around erefactor-hack-ahs-dropdown-list-p () activate)
-  (or
-   (setq ad-return-value
-         (remove-if-not
-          (lambda (ov) (overlay-get ov 'erefactor-overlay-p))
-          (overlays-in 
-           (max (1- (point)) (point-min))
-           (min (1+ (point)) (point-max)))))
-   ad-do-it))
+
+(eval-after-load "auto-highlight-symbol"
+  `(progn
+     (add-to-list 'ahs-inhibit-face-list 'erefactor-highlight-face)
+     ))
 
 ;;
 ;; map
@@ -857,6 +960,7 @@ See variable `erefactor-lint-emacsen'."
     (define-key map "h" 'erefactor-highlight-current-symbol)
     (define-key map "l" 'erefactor-lint)
     (define-key map "r" 'erefactor-rename-symbol-in-buffer)
+    (define-key map "?" 'erefactor-flymake-display-errors)
 
     (setq erefactor-map map)))
 
@@ -893,3 +997,4 @@ See variable `erefactor-lint-emacsen'."
 (provide 'erefactor)
 
 ;;; erefactor.el ends here
+
