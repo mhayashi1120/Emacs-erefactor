@@ -5,6 +5,7 @@
 ;; URL: http://github.com/mhayashi1120/Emacs-erefactor/raw/master/erefactor.el
 ;; URL: http://www.emacswiki.org/emacs/download/erefactor.el
 ;; Emacs: GNU Emacs 22 or later
+;; Version: 0.5.0
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -858,9 +859,11 @@ See variable `erefactor-lint-emacsen'."
         (command (expand-file-name (invocation-name) (invocation-directory)))
         temp-file)
     (when (buffer-modified-p)
-      (let ((coding-system-for-write buffer-file-coding-system))
-        (write-region (point-min) (point-max) erefactor-flymake-temp-file nil 'no-msg)
-        (setq temp-file erefactor-flymake-temp-file)))
+      (save-restriction
+        (widen)
+        (let ((coding-system-for-write buffer-file-coding-system))
+          (write-region (point-min) (point-max) erefactor-flymake-temp-file nil 'no-msg)
+          (setq temp-file erefactor-flymake-temp-file))))
     (list command
           (erefactor-lint-command-args command file temp-file))))
 
