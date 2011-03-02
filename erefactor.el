@@ -101,6 +101,8 @@
 (defvar this-command)
 (defvar timer-idle-list)
 (defvar current-prefix-arg)
+(defvar unread-command-events)
+(defvar buffer-file-coding-system)
 
 (defgroup erefactor nil
   "Emacs Lisp Refactoring utilities"
@@ -138,9 +140,9 @@
            (add-to-list 'ret file)))
        obarray))
     ;;TODO refactor
-    (let ((files (append (erefactor--symbol-using-sources symbol 'defun)
-                         (erefactor--symbol-using-sources symbol 'defvar)
-                         (erefactor--symbol-using-sources symbol 'defface))))
+    (let ((files (append (erefactor--symbol-using-sources 'defun symbol)
+                         (erefactor--symbol-using-sources 'defvar symbol)
+                         (erefactor--symbol-using-sources 'defface symbol))))
       (setq ret (union files ret)))
     ret))
 
@@ -286,9 +288,9 @@ the module have observance of `require'/`provide' system.
    (erefactor-rename-symbol-read-args 'erefactor--read-symbol-history))
   (let* ((symbol (intern-soft old-name))
          (guessed-files (erefactor--guessed-using-files symbol)))
-    (when buffer-file-name
-      (unless (member buffer-file-name guessed-files)
-        (setq guessed-files (cons buffer-file-name guessed-files))))
+    (when (buffer-file-name)
+      (unless (member (buffer-file-name) guessed-files)
+        (setq guessed-files (cons (buffer-file-name) guessed-files))))
     (mapc
      (lambda (file)
        (erefactor-with-file file
@@ -320,6 +322,26 @@ OLD-PREFIX: `foo-' -> NEW-PREFIX: `baz-'
   (erefactor-change-symbol-prefix old-prefix new-prefix 
                                   nil 'erefactor-after-rename-symbol))
 
+(defun erefactor-add-current-defun ()
+  "Add current defun form to `load-history'
+This is usefull when creating new definition."
+  (interactive)
+  (unless (buffer-file-name)
+    (error "Buffer is not associated any file"))
+  (save-excursion
+    (end-of-defun)
+    (beginning-of-defun)
+    (let* ((sexp (read (current-buffer)))
+           (type (cdr (assq (car sexp) erefactor-def-alist)))
+           (name (cadr sexp)))
+      (when type
+        (let ((hist (erefactor--find-load-history type name)))
+          ;; when not loaded in `load-history'
+          (unless hist
+            (erefactor--add-load-name
+             (buffer-file-name) type name))))
+      (message "%s" name))))
+
 ;; (defun erefactor-before-rename-symbol (old-name captured new-name)
 ;;   (cond
 ;;    ((erefactor-context-code-p)
@@ -329,6 +351,22 @@ OLD-PREFIX: `foo-' -> NEW-PREFIX: `baz-'
 ;;    (t
 ;;     (y-or-n-p "Replace? "))))
 
+(defconst erefactor-def-alist
+  '(
+    ;; Variable cell
+    (defvar . defvar)
+    (defcustom . defvar)
+    (defconst . defvar)
+
+    ;; Function cell
+    (defun . defun)
+    (defmacro . defun)
+    (defun*  . defun)
+    (defmacro* . defun)
+    ;; Face
+    (defface . defface)
+    ))
+
 (defun erefactor-after-rename-symbol (old-name new-name)
   (let ((fnsym (erefactor--current-fnsym))
         (old (intern old-name))
@@ -337,13 +375,9 @@ OLD-PREFIX: `foo-' -> NEW-PREFIX: `baz-'
     ;; if `defvar' or `defcustom' current value will be cleared.
     (eval-defun nil)
     (when (eq (cadr fnsym) new)
-      (case (car fnsym)
-        ((defvar defcustom defconst)
-         (erefactor--change-load-name old new 'defvar))
-        ((defun defmacro)
-         (erefactor--change-load-name old new 'defun))
-        ((defface)
-         (erefactor--change-load-name old new 'defface))))))
+      (let ((type (cdr (assq (car fnsym) erefactor-def-alist))))
+        (when (memq type '(defvar defun defface))
+          (erefactor--change-load-name old new type))))))
 
 (defun erefactor--current-fnsym ()
   (save-excursion
@@ -375,23 +409,51 @@ OLD-PREFIX: `foo-' -> NEW-PREFIX: `baz-'
       (defface . ,faces)
       (defvar . ,vars))))
 
+(defun erefactor--add-load-name (file type symbol)
+  (let ((defs (erefactor--find-load-history type symbol)))
+    ;; When duplicated definition exists, `load-history' simply have duplicated values.
+    (unless defs
+      (let ((hist (assoc file load-history)))
+        (unless hist
+          (error "%s is not loaded" file))
+        (setcdr (last hist)
+                (cond
+                 ((memq type '(defun defface))
+                  (list (cons type symbol)))
+                 ((eq type 'defvar)
+                  (list symbol))))))))
+
 (defun erefactor--change-load-name (old-symbol new-symbol type)
-  (let* ((defs (erefactor--symbol-defined-alist old-symbol))
-         (files (cdr (assq type defs))))
+  (let ((defs (erefactor--find-load-history type old-symbol)))
+    (mapc
+     (lambda (def)
+       (cond
+        ((memq type '(defun defface))
+         (setcdr def new-symbol))
+        (t
+         (setcar def new-symbol))))
+     defs)))
+
+(defun erefactor--find-load-history (type symbol)
+  (let* ((defs (erefactor--symbol-defined-alist symbol))
+         (files (cdr (assq type defs)))
+         (res '()))
     (mapc
      (lambda (file)
        (let ((def (cdr (assoc file load-history))))
          (cond
           ((memq type '(defun defface))
-           (let ((tmp (rassq old-symbol def)))
-             (when tmp
-               (setcdr tmp new-symbol))))
+           (let ((tmp (rassq symbol def)))
+             (when (and tmp (car tmp) type)
+               (setq res (cons tmp res)))))
           (t
-           (let ((tmp (memq old-symbol def)))
-             (setcar tmp new-symbol))))))
-     files)))
+           (let ((tmp (memq symbol def)))
+             (when tmp
+               (setq res (cons tmp res))))))))
+     files)
+    res))
 
-(defun erefactor--symbol-package (symbol type)
+(defun erefactor--symbol-package (type symbol)
   (let* ((defs (erefactor--symbol-defined-alist symbol))
          (files (cdr (assq type defs))))
     (catch 'found
@@ -404,8 +466,8 @@ OLD-PREFIX: `foo-' -> NEW-PREFIX: `baz-'
       nil)))
 
 ;;TODO merge to erefactor--guessed-using-files
-(defun erefactor--symbol-using-sources (symbol type)
-  (let ((package (erefactor--symbol-package symbol type)))
+(defun erefactor--symbol-using-sources (type symbol)
+  (let ((package (erefactor--symbol-package type symbol)))
     (loop for defs in load-history
           when (loop for def in (cdr defs)
                      when (and (listp def) 
@@ -870,6 +932,8 @@ See variable `erefactor-lint-emacsen'."
 (defvar erefactor-flymake-temp-file nil)
 (defconst erefactor-flymake-error-buffer-name " *Erefactor errors* ")
 
+(defalias 'erefactor-flymake-have-errs-p 'erefactor-flymake-data)
+
 (defun erefactor-flymake-display-errors ()
   (interactive)
   (if (not (erefactor-flymake-have-errs-p))
@@ -894,8 +958,6 @@ See variable `erefactor-lint-emacsen'."
 
 (defun erefactor-flymake-err-get-title (x) (nth 0 x))
 (defun erefactor-flymake-err-get-errs (x) (nth 1 x))
-
-(defalias 'erefactor-flymake-have-errs-p 'erefactor-flymake-data)
 
 (defun erefactor-flymake-data ()
   (let* ((line-no (flymake-current-line-no))
@@ -955,6 +1017,7 @@ See variable `erefactor-lint-emacsen'."
 
     (define-key map "L" 'erefactor-lint-by-emacsen)
     (define-key map "R" 'erefactor-rename-symbol-in-package)
+    (define-key map "A" 'erefactor-add-current-defun)
     (define-key map "c" 'erefactor-change-prefix-in-buffer)
     (define-key map "d" 'erefactor-dehighlight-all-symbol)
     (define-key map "h" 'erefactor-highlight-current-symbol)
