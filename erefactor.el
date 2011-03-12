@@ -5,7 +5,7 @@
 ;; URL: http://github.com/mhayashi1120/Emacs-erefactor/raw/master/erefactor.el
 ;; URL: http://www.emacswiki.org/emacs/download/erefactor.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 0.5.1
+;; Version: 0.5.2
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -539,6 +539,8 @@ This is usefull when creating new definition."
   :group 'erefactor)
 
 (defvar erefactor-highlight-face 'erefactor-highlight-face)
+(defvar erefactor-highlighting-overlays nil)
+(make-variable-buffer-local 'erefactor-highlighting-overlays)
 
 (defun erefactor-highlight-update-region (start end regexp &optional ignore-case check)
   "highlight START to END word that match to REGEXP.
@@ -547,6 +549,7 @@ CHECK is function that accept no arg and return boolean."
     (save-excursion
       (goto-char start)
       (let ((case-fold-search ignore-case))
+        (setq erefactor-highlighting-overlays nil)
         (while (and (re-search-forward regexp nil t)
                     (< (point) end))
           (when (or (null check)
@@ -554,7 +557,11 @@ CHECK is function that accept no arg and return boolean."
             (let ((ov (make-overlay (match-beginning 0) (match-end 0))))
               (overlay-put ov 'priority 1) ;; few value
               (overlay-put ov 'face erefactor-highlight-face)
-              (overlay-put ov 'erefactor-overlay-p t))))))))
+              (overlay-put ov 'erefactor-overlay-p t)
+              ;;FIXME not activated immediately if be in the timer.
+              (overlay-put ov 'keymap erefactor-highlight-map)
+              (setq erefactor-highlighting-overlays 
+                    (cons ov erefactor-highlighting-overlays)))))))))
 
 (defun erefactor-dehighlight-all ()
   (save-match-data
@@ -562,7 +569,8 @@ CHECK is function that accept no arg and return boolean."
      (lambda (ov)
        (when (overlay-get ov 'erefactor-overlay-p)
          (delete-overlay ov)))
-     (overlays-in (point-min) (point-max)))))
+     (overlays-in (point-min) (point-max))))
+  (setq erefactor-highlighting-overlays nil))
 
 (defmacro erefactor-with-file (file &rest form)
   (declare (indent 1))
@@ -679,12 +687,21 @@ Force to dehighlight \\[erefactor-dehighlight-all-symbol]"
     (unless symbol
       (error "No symbol at point"))
     (erefactor-highlight-update-region 
-     (point-min) (point-max) (erefactor-create-regexp symbol))))
+     (point-min) (point-max) (erefactor-create-regexp symbol))
+    (erefactor-lazy-highlight-suspend)
+    (add-to-list 'after-change-functions 'erefactor-dehighlight-after-change)))
 
 (defun erefactor-dehighlight-all-symbol ()
   "Dehighlight the all highlighted symbols in this buffer."
   (interactive)
-  (erefactor-dehighlight-all))
+  (erefactor-dehighlight-all)
+  (erefactor-lazy-highlight-resume))
+
+(defun erefactor-dehighlight-after-change (start end old-len)
+  (ignore-errors
+    (setq after-change-functions
+          (remove 'erefactor-dehighlight-after-change after-change-functions))
+    (erefactor-dehighlight-all-symbol)))
 
 ;;
 ;; lazy highlight local variable
@@ -708,7 +725,16 @@ In highlight mode, the highlight the current symbol if recognize as a local vari
 (defun erefactor-lazy-highlight-turn-on ()
   (erefactor-highlight-mode 1))
 
+(defun erefactor-lazy-highlight-suspend ()
+  (setq erefactor-lazy-highlight--suspended t))
+
+(defun erefactor-lazy-highlight-resume ()
+  (setq erefactor-lazy-highlight--suspended nil))
+
 (defvar erefactor-lazy-highlight--timer nil)
+
+(defvar erefactor-lazy-highlight--suspended nil)
+(make-variable-buffer-local 'erefactor-lazy-highlight--suspended)
 
 (defun erefactor-lazy-highlight--stop ()
   (when erefactor-lazy-highlight--timer
@@ -745,19 +771,44 @@ In highlight mode, the highlight the current symbol if recognize as a local vari
        ;; ex: erefactor-rename-symbol-*
        (this-command)
        ((not erefactor-highlight-mode))
+       ;; t means suppress lazy highlight
+       ((eq erefactor-lazy-highlight--suspended t))
        (t
-        (erefactor-lazy-highlight--dehihglight)
-        (let ((symbol (thing-at-point 'symbol)))
-          (when symbol
-            (let ((region (erefactor--find-local-binding symbol)))
-              (when region
-                (erefactor-highlight-update-region 
-                 (car region) (cdr region)
-                 (erefactor-create-regexp symbol)
-                 nil 'erefactor-context-code-p)
-                (add-hook 'post-command-hook 'erefactor-lazy-highlight--post-command)))))))
+        (save-match-data
+          (erefactor-lazy-highlight--dehihglight)
+          (let ((symbol (thing-at-point 'symbol)))
+            (when symbol
+              (let ((region (erefactor--find-local-binding symbol)))
+                (when region
+                  (erefactor-highlight-update-region 
+                   (car region) (cdr region)
+                   (erefactor-create-regexp symbol)
+                   nil 'erefactor-context-code-p)
+                  ;;FIXME keymap not updated
+                  ;; (add-hook 'post-command-hook 'erefactor-lazy-highlight--post-command)
+                  )))))))
     ;; completely ignore all errors
     (error nil)))
+
+(defun erefactor-highlight-previous-symbol ()
+  "FIXME Not works well"
+  (interactive)
+  (erefactor-highlight-move-symbol nil))
+
+(defun erefactor-highlight-next-symbol ()
+  "FIXME Not works well"
+  (interactive)
+  (erefactor-highlight-move-symbol t))
+
+(defun erefactor-highlight-move-symbol (forward-p)
+  (let* ((ovs (sort (copy-seq erefactor-highlighting-overlays)
+                    `(lambda (x y) (,(if forward-p '< '>) (overlay-start x) (overlay-start y)))))
+         (ov (find-if (lambda (x) (overlay-get x 'erefactor-overlay-p)) (overlays-at (point))))
+         (ov2 (cadr (memq ov ovs))))
+    (when (or ov2 ovs)
+      (let ((next (overlay-start (or ov2 (car ovs)))))
+        (when next
+          (goto-char next))))))
 
 (defcustom erefactor-lint-emacsen nil
   "*Emacs executables.
@@ -1001,10 +1052,9 @@ See variable `erefactor-lint-emacsen'."
 ;;
 
 
-(eval-after-load "auto-highlight-symbol"
+(eval-after-load 'auto-highlight-symbol
   `(progn
-     (add-to-list 'ahs-inhibit-face-list 'erefactor-highlight-face)
-     ))
+     (add-to-list 'ahs-inhibit-face-list 'erefactor-highlight-face)))
 
 ;;
 ;; map
@@ -1026,6 +1076,16 @@ See variable `erefactor-lint-emacsen'."
     (define-key map "?" 'erefactor-flymake-display-errors)
 
     (setq erefactor-map map)))
+
+(defvar erefactor-highlight-map nil)
+
+(unless erefactor-highlight-map
+  (let ((map (make-sparse-keymap)))
+
+    (define-key map (kbd "M-<left>") 'erefactor-highlight-previous-symbol)
+    (define-key map (kbd "M-<right>") 'erefactor-highlight-next-symbol)
+
+    (setq erefactor-highlight-map map)))
 
 ;;
 ;; unit test
