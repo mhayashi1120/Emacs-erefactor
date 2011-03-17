@@ -322,6 +322,7 @@ OLD-PREFIX: `foo-' -> NEW-PREFIX: `baz-'
   (erefactor-change-symbol-prefix old-prefix new-prefix 
                                   nil 'erefactor-after-rename-symbol))
 
+;;TODO like define-derived-mode
 (defun erefactor-add-current-defun ()
   "Add current defun form to `load-history'
 This is usefull when creating new definition."
