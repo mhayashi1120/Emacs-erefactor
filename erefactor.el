@@ -1,6 +1,6 @@
 ;;; erefactor.el --- Emacs-Lisp tools
 
-;; Author: Hayashi Masahiro <mhayashi1120@gmail.com>
+;; Author: Masahiro Hayashi <mhayashi1120@gmail.com>
 ;; Keywords: elisp refactor lint
 ;; URL: http://github.com/mhayashi1120/Emacs-erefactor/raw/master/erefactor.el
 ;; URL: http://www.emacswiki.org/emacs/download/erefactor.el
