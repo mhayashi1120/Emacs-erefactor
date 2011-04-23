@@ -89,7 +89,8 @@
 ;;; Code:
 
 (eval-when-compile
-  (require 'cl))
+  (require 'cl)
+  (require 'easy-mmode))
 
 ;; externals
 (defvar load-path)
@@ -690,7 +691,7 @@ Force to dehighlight \\[erefactor-dehighlight-all-symbol]"
     (erefactor-highlight-update-region 
      (point-min) (point-max) (erefactor-create-regexp symbol))
     (erefactor-lazy-highlight-suspend)
-    (add-to-list 'after-change-functions 'erefactor-dehighlight-after-change)))
+    (add-hook 'after-change-functions 'erefactor-dehighlight-after-change)))
 
 (defun erefactor-dehighlight-all-symbol ()
   "Dehighlight the all highlighted symbols in this buffer."
@@ -700,8 +701,7 @@ Force to dehighlight \\[erefactor-dehighlight-all-symbol]"
 
 (defun erefactor-dehighlight-after-change (start end old-len)
   (ignore-errors
-    (setq after-change-functions
-          (remove 'erefactor-dehighlight-after-change after-change-functions))
+    (remove-hook 'after-change-functions 'erefactor-dehighlight-after-change)
     (erefactor-dehighlight-all-symbol)))
 
 ;;
@@ -910,8 +910,21 @@ See variable `erefactor-lint-emacsen'."
          (sexp `(progn 
                   (setq load-path (append load-path ',path)) 
                   (find-file ,(or temp-file file))
-                  ;;FIXME security risk?
-                  ;; (eval-buffer)
+                  (goto-char (point-min))
+                  (condition-case err
+                      (let (sexp)
+                        (while t
+                          (setq sexp (read (current-buffer)))
+                          (cond
+                           ((memq (car-safe sexp) '(require))
+                            (princ (format "Evaluating %s...\n" sexp))
+                            (eval sexp))
+                           ((eq (car-safe sexp) 'eval-when-compile)
+                            (princ (format "Evaluating %s...\n" `(progn ,@(cdr-safe sexp))))
+                            (eval `(progn ,@(cdr-safe sexp)))))))
+                    (error nil))
+                  ;;TODO trick 
+                  (macroexpand '(labels ()))
                   (elint-initialize)
                   (elint-current-buffer)
                   (with-current-buffer "*Elint*"
@@ -1121,4 +1134,3 @@ See variable `erefactor-lint-emacsen'."
 (provide 'erefactor)
 
 ;;; erefactor.el ends here
-
