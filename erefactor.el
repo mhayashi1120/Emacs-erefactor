@@ -344,6 +344,13 @@ This is usefull when creating new definition."
              (buffer-file-name) type name))))
       (message "%s" name))))
 
+(defun erefactor-eval-current-defun (&optional edebug-it)
+  "Evaluate current defun and add definition to `load-history'"
+  (interactive "P")
+  (eval-defun edebug-it)
+  (when buffer-file-name
+    (erefactor-add-current-defun)))
+
 ;; (defun erefactor-before-rename-symbol (old-name captured new-name)
 ;;   (cond
 ;;    ((erefactor-context-code-p)
@@ -1087,6 +1094,7 @@ See variable `erefactor-lint-emacsen'."
     (define-key map "h" 'erefactor-highlight-current-symbol)
     (define-key map "l" 'erefactor-lint)
     (define-key map "r" 'erefactor-rename-symbol-in-buffer)
+    (define-key map "x" 'erefactor-eval-current-defun)
     (define-key map "?" 'erefactor-flymake-display-errors)
 
     (setq erefactor-map map)))
