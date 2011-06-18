@@ -3,7 +3,6 @@
 ;; Author: Masahiro Hayashi <mhayashi1120@gmail.com>
 ;; Keywords: elisp refactor lint
 ;; URL: http://github.com/mhayashi1120/Emacs-erefactor/raw/master/erefactor.el
-;; URL: http://www.emacswiki.org/emacs/download/erefactor.el
 ;; Emacs: GNU Emacs 22 or later
 ;; Version: 0.5.3
 
@@ -85,6 +84,8 @@
 ;; * Devide to other elisp file about elint and flymake
 ;;
 ;; * flymake not works emacs-22
+
+;; * Slowing down the Emacs when too many macroexpand in highlight-symbol-mode
 
 ;;; Code:
 
@@ -297,7 +298,7 @@ the module have observance of `require'/`provide' system.
        (erefactor-with-file file
          (erefactor-rename-region 
           old-name new-name nil nil
-          'erefactor-after-rename-symbol)))
+          (erefactor-after-rename-function))))
      guessed-files)))
 
 (defun erefactor-rename-symbol-in-buffer (old-name new-name)
@@ -308,7 +309,7 @@ This affect to current buffer."
   (let ((region (erefactor--find-local-binding old-name))
         after)
     (unless region
-      (setq after 'erefactor-after-rename-symbol))
+      (setq after (erefactor-after-rename-function)))
     (erefactor-rename-region old-name new-name region nil after)))
 
 (defun erefactor-change-prefix-in-buffer (old-prefix new-prefix)
@@ -321,7 +322,7 @@ OLD-PREFIX: `foo-' -> NEW-PREFIX: `baz-'
   (interactive 
    (erefactor-change-prefix-read-args 'erefactor--read-prefix-history))
   (erefactor-change-symbol-prefix old-prefix new-prefix 
-                                  nil 'erefactor-after-rename-symbol))
+                                  nil (erefactor-after-rename-function)))
 
 ;;TODO like define-derived-mode
 (defun erefactor-add-current-defun ()
@@ -375,6 +376,15 @@ This is usefull when creating new definition."
     ;; Face
     (defface . defface)
     ))
+
+(defvar erefactor-after-rename-function-alist
+  '(
+    (emacs-lisp-mode . erefactor-after-rename-symbol)
+    (lisp-interaction-mode . erefactor-after-rename-symbol)
+    ))
+
+(defun erefactor-after-rename-function ()
+  (cdr (assq major-mode erefactor-after-rename-function-alist)))
 
 (defun erefactor-after-rename-symbol (old-name new-name)
   (let ((fnsym (erefactor--current-fnsym))
