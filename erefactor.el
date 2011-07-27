@@ -219,12 +219,21 @@
    (and (eq (car-safe form) 'eieio-defmethod)
         (erefactor--eieio-defmethod-contains-p (caadr (caddr form)) name))))
 
+;; To avoid too many recursion.
+;; Slow down the emacs if form contains a lot of macro. (ex: ert-deftest)
+(defvar erefactor--macroexpand-depth 0)
+
+;; This default value means to adequate the `loop' macro
+(defvar erefactor--macroexpand-max-depth 3)
+
 (defun erefactor--macroexpand-contains-p (name form)
   ;; `lambda' is macro expanded like (function (lambda () ...))
-  (when (and (not (memq (car-safe form) '(lambda))) 
+  (when (and (< erefactor--macroexpand-depth erefactor--macroexpand-max-depth)
+             (not (memq (car-safe form) '(lambda))) 
              (erefactor-macrop (car-safe form)))
     (condition-case nil
-        (let ((expand-form (macroexpand form)))
+        (let ((erefactor--macroexpand-depth (1+ erefactor--macroexpand-depth))
+              (expand-form (macroexpand form)))
           (catch 'found
             (when (erefactor--local-binding-p name expand-form)
               (throw 'found t))
