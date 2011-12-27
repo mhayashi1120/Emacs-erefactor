@@ -296,7 +296,7 @@ Please remember, this function only works well if
 the module have observance of `require'/`provide' system.
 "
   (interactive 
-   (erefactor-rename-symbol-read-args 'erefactor--read-symbol-history))
+   (erefactor-rename-symbol-read-args))
   (let* ((symbol (intern-soft old-name))
          (guessed-files (erefactor--guessed-using-files symbol)))
     (when (buffer-file-name)
@@ -314,7 +314,7 @@ the module have observance of `require'/`provide' system.
   "Rename symbol at point resolving reference local variable as long as i can with queries.
 This affect to current buffer."
   (interactive 
-   (erefactor-rename-symbol-read-args 'erefactor--read-symbol-history))
+   (erefactor-rename-symbol-read-args))
   (let ((region (erefactor--find-local-binding old-name))
         after)
     (unless region
@@ -329,7 +329,7 @@ OLD-PREFIX: `foo-' -> NEW-PREFIX: `baz-'
 `foo-variable1' -> `baz-variable1'
 "
   (interactive 
-   (erefactor-change-prefix-read-args 'erefactor--read-prefix-history))
+   (erefactor-change-prefix-read-args))
   (erefactor-change-symbol-prefix old-prefix new-prefix 
                                   nil (erefactor-after-rename-function)))
 
@@ -684,24 +684,32 @@ Optional arg AFTER-FUNC is called with two args old-name and new-name after repl
                 (erefactor--call-after after-func old-name new-name))
             (erefactor-dehighlight-in-interactive)))))))
 
-(defun erefactor-rename-symbol-read-args (hist-var)
+(defun erefactor-rename-symbol-read-args ()
   (let (current-name prompt new-name)
     (barf-if-buffer-read-only)
     (unless (setq current-name (thing-at-point 'symbol))
       (error "No symbol at point"))
     (setq prompt (format "%s -> New name: " current-name))
-    (setq new-name (read-string prompt current-name hist-var))
+    (setq new-name 
+          (read-string 
+           prompt current-name 
+           'erefactor--read-symbol-history))
     (when (string= current-name new-name)
       (error "No difference"))
     (list current-name new-name)))
 
-(defun erefactor-change-prefix-read-args (hist-var)
+(defun erefactor-change-prefix-read-args ()
   (let (current-prefix prompt new-prefix)
     (barf-if-buffer-read-only)
     (setq current-prefix (thing-at-point 'symbol))
-    (setq current-prefix (read-string "Changing prefix: " current-prefix hist-var))
+    (setq current-prefix 
+          (read-string 
+           "Changing prefix: " current-prefix
+           'erefactor--read-prefix-history))
     (setq prompt (format "Changing prefix: %s -> New prefix: " current-prefix))
-    (setq new-prefix (read-string prompt current-prefix hist-var))
+    (setq new-prefix 
+          (read-string 
+           prompt current-prefix 'erefactor--read-prefix-history))
     (when (string= current-prefix new-prefix)
       (error "No difference"))
     (list current-prefix new-prefix)))
@@ -792,38 +800,40 @@ In highlight mode, the highlight the current symbol if recognize as a local vari
   (remove-hook 'post-command-hook 'erefactor-lazy-highlight--post-command))
 
 (defun erefactor-lazy-highlight--highlight ()
-  (condition-case nil
-      (cond
-       ;; ignore when other command executing.
-       ;; ex: erefactor-rename-symbol-*
-       (this-command)
-       ((not erefactor-highlight-mode))
-       ;; t means suppress lazy highlight
-       ((eq erefactor-lazy-highlight--suspended t))
-       (t
-        (save-match-data
-          (erefactor-lazy-highlight--dehihglight)
-          (let ((symbol (thing-at-point 'symbol)))
-            (when symbol
-              (let ((region (erefactor--find-local-binding symbol)))
-                (when region
-                  (erefactor-highlight-update-region 
-                   (car region) (cdr region)
-                   (erefactor-create-regexp symbol)
-                   nil 'erefactor-context-code-p)
-                  ;;FIXME keymap not updated
-                  ;; (add-hook 'post-command-hook 'erefactor-lazy-highlight--post-command)
-                  )))))))
-    ;; completely ignore all errors
-    (error nil)))
+  (save-match-data
+    (with-local-quit
+      (condition-case nil
+          (cond
+           ;; ignore when other command executing.
+           ;; ex: erefactor-rename-symbol-*
+           (this-command)
+           ((not erefactor-highlight-mode))
+           ;; t means suppress lazy highlight
+           ((eq erefactor-lazy-highlight--suspended t))
+           (t
+            (save-match-data
+              (erefactor-lazy-highlight--dehihglight)
+              (let ((symbol (thing-at-point 'symbol)))
+                (when symbol
+                  (let ((region (erefactor--find-local-binding symbol)))
+                    (when region
+                      (erefactor-highlight-update-region 
+                       (car region) (cdr region)
+                       (erefactor-create-regexp symbol)
+                       nil 'erefactor-context-code-p)
+                      ;;FIXME keymap not updated
+                      ;; (add-hook 'post-command-hook 'erefactor-lazy-highlight--post-command)
+                      )))))))
+        ;; completely ignore all errors
+        (error nil)))))
 
 (defun erefactor-highlight-previous-symbol ()
-  "FIXME Not works well"
+  "Move to previous highlighting symbol."
   (interactive)
   (erefactor-highlight-move-symbol nil))
 
 (defun erefactor-highlight-next-symbol ()
-  "FIXME Not works well"
+  "Move to next highlighting symbol."
   (interactive)
   (erefactor-highlight-move-symbol t))
 
