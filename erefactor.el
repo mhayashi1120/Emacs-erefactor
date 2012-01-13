@@ -1138,36 +1138,6 @@ See variable `erefactor-lint-emacsen'."
 
     (setq erefactor-highlight-map map)))
 
-;;
-;; unit test
-;;
-
-(dont-compile
-  (when (fboundp 'expectations)
-
-    (expectations 
-     (expect t (erefactor--local-binding-p 'v '(defun f (v))))
-     (expect t (erefactor--local-binding-p 'v '(lambda (v))))
-     (expect t (erefactor--local-binding-p 'v '(let ((v v1)))))
-     (expect t (erefactor--local-binding-p 'tag '(catch 'tag)))
-
-     (expect nil (erefactor--local-binding-p 'v '(defun f (v1) v)))
-     (expect nil (erefactor--local-binding-p 'v '(lambda (v1) v)))
-     (expect nil (erefactor--local-binding-p 'v '(let ((v1 val)) v)))
-     (expect nil (erefactor--local-binding-p 'tag '(catch 'tag1 tag)))
-
-     (expect t (erefactor--macroexpand-contains-p 'v '(defun* f (v))))
-     (expect t (erefactor--macroexpand-contains-p 'k1 '(defun* f (v1 &key k1))))
-     (expect nil (erefactor--macroexpand-contains-p 'v '(defun* f (v1) v)))
-
-     ;; check ignoring failed (defface) form expansion
-     (expect nil (erefactor--macroexpand-contains-p 'v1 '(when test (case v1 (defface)))))
-
-     ;; cannot test `erefactor--local-fbinding' because that move point.
-     )))
-
-;; (expectations-execute)
-
 (provide 'erefactor)
 
 ;;; erefactor.el ends here
