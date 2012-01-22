@@ -29,8 +29,8 @@
 
 ;;; Install:
 
-;; Put this file into load-path'ed directory, 
-;; and byte compile its if desired. 
+;; Put this file into load-path'ed directory,
+;; and byte compile its if desired.
 ;; And put the following expression into your ~/.emacs.
 ;;
 ;;     (require 'erefactor)
@@ -51,13 +51,13 @@
 ;; C-c C-v l : elint current buffer in clean environment.
 ;; C-c C-v L : elint current buffer by multiple emacs binaries.
 ;;             See `erefactor-lint-emacsen'
-;; C-c C-v r : Rename symbol in current buffer. 
+;; C-c C-v r : Rename symbol in current buffer.
 ;;             Resolve `let' binding as long as i can.
-;; C-c C-v R : Rename symbol in requiring modules and current buffer. 
+;; C-c C-v R : Rename symbol in requiring modules and current buffer.
 ;; C-c C-v h : Highlight current symbol in this buffer
 ;;             and suppress `erefacthr-highlight-mode'.
 ;; C-c C-v d : Dehighlight all by above command.
-;; C-c C-v c : Switch prefix bunch of symbols. 
+;; C-c C-v c : Switch prefix bunch of symbols.
 ;;             ex: '(hoge-var hoge-func) -> '(foo-var foo-func)
 ;; C-c C-v ? : Display flymake elint warnings/errors
 
@@ -66,7 +66,7 @@
 ;;
 ;; * `.' is not a separator of lisp symbol.
 ;;   rename `region' symbol and `REGION.' in docstring
-;;   don't use re-search while idiom, 
+;;   don't use re-search while idiom,
 ;;   gather symbols in code, string, comment each context.
 ;; (defun hoge (region)
 ;;   "REGION is REGION."
@@ -190,7 +190,7 @@
             (when (and (consp region)
                        (< (car region) first)
                        (> first (car region)))
-              ;; at start definition of local function 
+              ;; at start definition of local function
               ;; (flet ((func (a b) (list a b))))
               ;;        ^^
               (goto-char (car region))
@@ -229,7 +229,7 @@
 (defun erefactor--macroexpand-contains-p (name form)
   ;; `lambda' is macro expanded like (function (lambda () ...))
   (when (and (< erefactor--macroexpand-depth erefactor--macroexpand-max-depth)
-             (not (memq (car-safe form) '(lambda))) 
+             (not (memq (car-safe form) '(lambda)))
              (erefactor-macrop (car-safe form)))
     (condition-case nil
         (let ((erefactor--macroexpand-depth (1+ erefactor--macroexpand-depth))
@@ -277,7 +277,7 @@
 (defun erefactor--defadvice-binding-contains-p (ad-args name)
   (let* ((rest (cddr ad-args))
          ;; consider optional position arg
-         (args (if (consp (car rest)) 
+         (args (if (consp (car rest))
                    (car rest)
                  (cadr rest))))
     (erefactor--lambda-binding-contains-p args name)))
@@ -292,10 +292,10 @@
 (defun erefactor-rename-symbol-in-package (old-name new-name)
   "Rename symbol at point with queries. This affect to current buffer and requiring modules.
 
-Please remember, this function only works well if 
+Please remember, this function only works well if
 the module have observance of `require'/`provide' system.
 "
-  (interactive 
+  (interactive
    (erefactor-rename-symbol-read-args))
   (let* ((symbol (intern-soft old-name))
          (guessed-files (erefactor--guessed-using-files symbol)))
@@ -305,7 +305,7 @@ the module have observance of `require'/`provide' system.
     (mapc
      (lambda (file)
        (erefactor-with-file file
-         (erefactor-rename-region 
+         (erefactor-rename-region
           old-name new-name nil nil
           (erefactor-after-rename-function))))
      guessed-files)))
@@ -313,7 +313,7 @@ the module have observance of `require'/`provide' system.
 (defun erefactor-rename-symbol-in-buffer (old-name new-name)
   "Rename symbol at point resolving reference local variable as long as i can with queries.
 This affect to current buffer."
-  (interactive 
+  (interactive
    (erefactor-rename-symbol-read-args))
   (let ((region (erefactor--find-local-binding old-name))
         after)
@@ -328,9 +328,9 @@ OLD-PREFIX: `foo-' -> NEW-PREFIX: `baz-'
 `foo-function1' -> `baz-function1'
 `foo-variable1' -> `baz-variable1'
 "
-  (interactive 
+  (interactive
    (erefactor-change-prefix-read-args))
-  (erefactor-change-symbol-prefix old-prefix new-prefix 
+  (erefactor-change-symbol-prefix old-prefix new-prefix
                                   nil (erefactor-after-rename-function)))
 
 ;;TODO like define-derived-mode
@@ -498,7 +498,7 @@ This is usefull when creating new definition."
   (let ((package (erefactor--symbol-package type symbol)))
     (loop for defs in load-history
           when (loop for def in (cdr defs)
-                     when (and (listp def) 
+                     when (and (listp def)
                                (eq (car def) 'require)
                                (eq package (cdr def)))
                      collect def)
@@ -548,7 +548,7 @@ This is usefull when creating new definition."
   (erefactor-dehighlight-all))
 
 (defun erefactor-re-highlight-in-interactive (regexp beg fin)
-  "Highlight REGEXP between BEG and FIN in region 
+  "Highlight REGEXP between BEG and FIN in region
 `erefactor--region-start' to `erefactor--region-end'."
   ;; highlight replacing text
   (if (overlayp erefactor--overlay)
@@ -588,7 +588,7 @@ CHECK is function that accept no arg and return boolean."
               (overlay-put ov 'erefactor-overlay-p t)
               ;;FIXME not activated immediately if be in the timer.
               (overlay-put ov 'keymap erefactor-highlight-map)
-              (setq erefactor-highlighting-overlays 
+              (setq erefactor-highlighting-overlays
                     (cons ov erefactor-highlighting-overlays)))))))))
 
 (defun erefactor-dehighlight-all ()
@@ -607,7 +607,7 @@ CHECK is function that accept no arg and return boolean."
      (if (setq buffer (get-file-buffer file))
          (setq opened t)
        (setq buffer (find-file-noselect file)))
-     (unwind-protect 
+     (unwind-protect
          (with-current-buffer buffer
            (save-window-excursion
              (set-window-buffer win buffer)
@@ -620,7 +620,7 @@ CHECK is function that accept no arg and return boolean."
 
 (defun erefactor--call-before (func old-name capture new-name)
   (save-match-data
-    (if func 
+    (if func
         (funcall func old-name capture new-name)
       (y-or-n-p "Rename? "))))
 
@@ -631,7 +631,7 @@ CHECK is function that accept no arg and return boolean."
 
 (defun erefactor-rename-region (symbol new-symbol &optional region before-func after-func)
   "Rename SYMBOL to NEW-SYMBOL in REGION.
-Optional arg BEFORE-FUNC is not used currently (TODO). 
+Optional arg BEFORE-FUNC is not used currently (TODO).
     But called with three args SYMBOL and NEW-SYMBOL before replacing.
     This function must return non-nil value if executing to replace.
 Optional arg AFTER-FUNC is called with two args SYMBOL and NEW-SYMBOL after replaced."
@@ -661,7 +661,7 @@ Optional arg AFTER-FUNC is called with two args SYMBOL and NEW-SYMBOL after repl
 
 (defun erefactor-change-symbol-prefix (prefix new-prefix &optional before-func after-func)
   "Switch symbol PREFIX to NEW-PREFIX in buffer.
-Optional arg BEFORE-FUNC is not used currently (TODO). 
+Optional arg BEFORE-FUNC is not used currently (TODO).
     But called with three args SYMBOL and NEW-SYMBOL before replacing.
     This function must return non-nil value if executing to replace.
 Optional arg AFTER-FUNC is called with two args old-name and new-name after replaced."
@@ -690,9 +690,9 @@ Optional arg AFTER-FUNC is called with two args old-name and new-name after repl
     (unless (setq current-name (thing-at-point 'symbol))
       (error "No symbol at point"))
     (setq prompt (format "%s -> New name: " current-name))
-    (setq new-name 
-          (read-string 
-           prompt current-name 
+    (setq new-name
+          (read-string
+           prompt current-name
            'erefactor--read-symbol-history))
     (when (string= current-name new-name)
       (error "No difference"))
@@ -702,13 +702,13 @@ Optional arg AFTER-FUNC is called with two args old-name and new-name after repl
   (let (current-prefix prompt new-prefix)
     (barf-if-buffer-read-only)
     (setq current-prefix (thing-at-point 'symbol))
-    (setq current-prefix 
-          (read-string 
+    (setq current-prefix
+          (read-string
            "Changing prefix: " current-prefix
            'erefactor--read-prefix-history))
     (setq prompt (format "Changing prefix: %s -> New prefix: " current-prefix))
-    (setq new-prefix 
-          (read-string 
+    (setq new-prefix
+          (read-string
            prompt current-prefix 'erefactor--read-prefix-history))
     (when (string= current-prefix new-prefix)
       (error "No difference"))
@@ -722,7 +722,7 @@ Force to dehighlight \\[erefactor-dehighlight-all-symbol]"
     (erefactor-dehighlight-all)
     (unless symbol
       (error "No symbol at point"))
-    (erefactor-highlight-update-region 
+    (erefactor-highlight-update-region
      (point-min) (point-max) (erefactor-create-regexp symbol))
     (erefactor-lazy-highlight-suspend)
     (add-hook 'after-change-functions 'erefactor-dehighlight-after-change)))
@@ -789,7 +789,7 @@ In highlight mode, the highlight the current symbol if recognize as a local vari
    (and erefactor-lazy-highlight--timer
         (memq erefactor-lazy-highlight--timer timer-idle-list))
    (setq erefactor-lazy-highlight--timer
-         (run-with-idle-timer idle-update-delay t 
+         (run-with-idle-timer idle-update-delay t
                               'erefactor-lazy-highlight--highlight))))
 
 (defun erefactor-lazy-highlight--dehihglight ()
@@ -817,7 +817,7 @@ In highlight mode, the highlight the current symbol if recognize as a local vari
                 (when symbol
                   (let ((region (erefactor--find-local-binding symbol)))
                     (when region
-                      (erefactor-highlight-update-region 
+                      (erefactor-highlight-update-region
                        (car region) (cdr region)
                        (erefactor-create-regexp symbol)
                        nil 'erefactor-context-code-p)
@@ -858,7 +858,7 @@ Examples:
   :type '(list file))
 
 (defcustom erefactor-lint-path-alist nil
-  "*Associate list key is file name of Elisp. 
+  "*Associate list key is file name of Elisp.
 value is `load-path' that required by key file if key file require some module.
 
 Examples:
@@ -904,7 +904,7 @@ See variable `erefactor-lint-emacsen'."
   (let ((command (car commands))
         (rest (cdr commands)))
     (let ((proc (erefactor-lint-internal command file)))
-      (set-process-sentinel 
+      (set-process-sentinel
        proc
        `(lambda (p e)
           (when (eq (process-status p) 'exit)
@@ -918,8 +918,8 @@ See variable `erefactor-lint-emacsen'."
   (with-current-buffer (process-buffer process)
     (let* ((code (process-exit-status process))
            (msg  (format " (Exit [%d])" code)))
-      (setq mode-line-process 
-            (propertize msg 'face 
+      (setq mode-line-process
+            (propertize msg 'face
                         (if (= code 0) 'compilation-info 'compilation-error))))))
 
 (defun erefactor-lint-internal (command file)
@@ -928,7 +928,7 @@ See variable `erefactor-lint-emacsen'."
     (display-buffer buffer)
     (with-current-buffer buffer
       (erefactor-lint-append (format "----- Linting by %s -----\n" command))
-      (let ((proc (apply 'start-process "Async Elint" (current-buffer) 
+      (let ((proc (apply 'start-process "Async Elint" (current-buffer)
                          command args)))
         (set-process-sentinel proc (lambda (p e)))
         (setq mode-line-process (propertize " (Running)" 'face 'compilation-warning))
@@ -943,8 +943,8 @@ See variable `erefactor-lint-emacsen'."
 (defun erefactor-lint-command-args (command file &optional temp-file)
   (let* ((path (erefactor-ref file erefactor-lint-path-alist))
          (version (erefactor-emacs-version command t))
-         (sexp `(progn 
-                  (setq load-path (append load-path ',path)) 
+         (sexp `(progn
+                  (setq load-path (append load-path ',path))
                   (find-file ,(or temp-file file))
                   (goto-char (point-min))
                   (condition-case err
@@ -959,7 +959,7 @@ See variable `erefactor-lint-emacsen'."
                             (princ (format "Evaluating %s...\n" `(progn ,@(cdr-safe sexp))))
                             (eval `(progn ,@(cdr-safe sexp)))))))
                     (error nil))
-                  ;;TODO trick 
+                  ;;TODO trick
                   (macroexpand '(labels ()))
                   (elint-initialize)
                   (elint-current-buffer)
@@ -985,18 +985,18 @@ See variable `erefactor-lint-emacsen'."
 (require 'flymake nil t)
 
 (defconst erefactor-flymake-allowed-file-name-masks
-  '("\\.el$" erefactor-flymake-init erefactor-flymake-cleanup 
+  '("\\.el$" erefactor-flymake-init erefactor-flymake-cleanup
     erefactor-flymake-get-real-file-name))
 
 (defconst erefactor-flymake-error-line-patterns
   '("^\\([^:]+\\.el\\):\\([0-9]+\\):\\([0-9]+\\):[ ]*\\(.+\\)" 1 2 3 4))
 
 (when (boundp 'flymake-allowed-file-name-masks)
-  (add-to-list 'flymake-allowed-file-name-masks 
+  (add-to-list 'flymake-allowed-file-name-masks
                erefactor-flymake-allowed-file-name-masks))
 
 (when (boundp 'flymake-err-line-patterns)
-  (add-to-list 'flymake-err-line-patterns 
+  (add-to-list 'flymake-err-line-patterns
                erefactor-flymake-error-line-patterns))
 
 (defun erefactor-flymake-cleanup ()
@@ -1053,7 +1053,7 @@ See variable `erefactor-lint-emacsen'."
 (defun erefactor-flymake-insert-errors (title errs)
   (save-excursion
     (insert title "\n\n")
-    (mapc 
+    (mapc
      (lambda (x) (insert x "\n"))
      errs)))
 
@@ -1076,7 +1076,7 @@ See variable `erefactor-lint-emacsen'."
 ;;
 
 (defun erefactor-macrop (symbol)
-  (and 
+  (and
    (symbolp symbol)
    (fboundp symbol)
    (eq (car-safe (symbol-function symbol)) 'macro)))
