@@ -243,17 +243,13 @@
       (error nil))))
 
 (defun erefactor--binding-exists-p (name form)
-  (catch 'found
-    (mapc
-     (lambda (f)
-       (when (or (erefactor--local-binding-p name f)
-                 (erefactor--macroexpand-contains-p name f))
-         (throw 'found t))
-       (when (and (listp f)
-                  (erefactor--binding-exists-p name f))
-         (throw 'found t)))
-     form)
-    nil))
+  (dolist (f form)
+    (when (or (erefactor--local-binding-p name f)
+              (erefactor--macroexpand-contains-p name f))
+      (return t))
+    (when (and (listp f)
+               (erefactor--binding-exists-p name f))
+      (return t))))
 
 (defun erefactor--condition-case-contains-p (form name)
   (let ((var (car-safe form)))
@@ -303,13 +299,11 @@ the module have observance of `require'/`provide' system.
     (when (buffer-file-name)
       (unless (member (buffer-file-name) guessed-files)
         (setq guessed-files (cons (buffer-file-name) guessed-files))))
-    (mapc
-     (lambda (file)
-       (erefactor-with-file file
-         (erefactor-rename-region
-          old-name new-name nil nil
-          (erefactor-after-rename-function))))
-     guessed-files)))
+    (dolist (file guessed-files)
+      (erefactor-with-file file
+        (erefactor-rename-region
+         old-name new-name nil nil
+         (erefactor-after-rename-function))))))
 
 ;;;###autoload
 (defun erefactor-rename-symbol-in-buffer (old-name new-name)
@@ -425,18 +419,17 @@ This is usefull when creating new definition."
       ret)))
 
 (defun erefactor--symbol-defined-alist (symbol)
-  (let (funcs faces vars tmp)
-    (mapc
-     (lambda (def)
-       (when (memq symbol (cdr def))
-         (push (car def) vars))
-       (when (and (setq tmp (rassq symbol (cdr def)))
-                  (eq (car tmp) 'defface))
-         (push (car def) faces))
-       (when (and (setq tmp (rassq symbol (cdr def)))
-                  (eq (car tmp) 'defun))
-         (push (car def) funcs)))
-     load-history)
+  (let (funcs faces vars)
+    (loop for (file . entries) in load-history
+          do (let (tmp)
+               (when (memq symbol entries)
+                 (push file vars))
+               (when (and (setq tmp (rassq symbol entries))
+                          (eq (car tmp) 'defface))
+                 (push file faces))
+               (when (and (setq tmp (rassq symbol entries))
+                          (eq (car tmp) 'defun))
+                 (push file funcs))))
     `((defun . ,funcs)
       (defface . ,faces)
       (defvar . ,vars))))
@@ -457,45 +450,37 @@ This is usefull when creating new definition."
 
 (defun erefactor--change-load-name (old-symbol new-symbol type)
   (let ((defs (erefactor--find-load-history type old-symbol)))
-    (mapc
-     (lambda (def)
-       (cond
-        ((memq type '(defun defface))
-         (setcdr def new-symbol))
-        (t
-         (setcar def new-symbol))))
-     defs)))
+    (dolist (def defs)
+      (cond
+       ((memq type '(defun defface))
+        (setcdr def new-symbol))
+       (t
+        (setcar def new-symbol))))))
 
 (defun erefactor--find-load-history (type symbol)
   (let* ((defs (erefactor--symbol-defined-alist symbol))
          (files (cdr (assq type defs)))
          (res '()))
-    (mapc
-     (lambda (file)
-       (let ((def (cdr (assoc file load-history))))
-         (cond
-          ((memq type '(defun defface))
-           (let ((tmp (rassq symbol def)))
-             (when (and tmp (car tmp) type)
-               (setq res (cons tmp res)))))
-          (t
-           (let ((tmp (memq symbol def)))
-             (when tmp
-               (setq res (cons tmp res))))))))
-     files)
+    (dolist (file files)
+      (let ((def (cdr (assoc file load-history))))
+        (cond
+         ((memq type '(defun defface))
+          (let ((tmp (rassq symbol def)))
+            (when (and tmp (car tmp) type)
+              (setq res (cons tmp res)))))
+         (t
+          (let ((tmp (memq symbol def)))
+            (when tmp
+              (setq res (cons tmp res))))))))
     res))
 
 (defun erefactor--symbol-package (type symbol)
   (let* ((defs (erefactor--symbol-defined-alist symbol))
          (files (cdr (assq type defs))))
-    (catch 'found
-      (mapc
-       (lambda (file)
-         (let ((tmp (cdr (assq 'provide (cdr (assoc file load-history))))))
-           (when tmp
-             (throw 'found tmp))))
-       files)
-      nil)))
+    (dolist (file files)
+      (let ((tmp (cdr (assq 'provide (cdr (assoc file load-history))))))
+        (when tmp
+          (return tmp))))))
 
 ;;TODO merge to erefactor--guessed-using-files
 (defun erefactor--symbol-using-sources (type symbol)
@@ -597,11 +582,9 @@ CHECK is function that accept no arg and return boolean."
 
 (defun erefactor-dehighlight-all ()
   (save-match-data
-    (mapc
-     (lambda (ov)
-       (when (overlay-get ov 'erefactor-overlay-p)
-         (delete-overlay ov)))
-     (overlays-in (point-min) (point-max))))
+    (dolist (ov (overlays-in (point-min) (point-max)))
+      (when (overlay-get ov 'erefactor-overlay-p)
+        (delete-overlay ov))))
   (setq erefactor-highlighting-overlays nil))
 
 (defmacro erefactor-with-file (file &rest form)
@@ -779,14 +762,10 @@ In highlight mode, the highlight the current symbol if recognize as a local vari
 
 (defun erefactor-lazy-highlight--stop ()
   (when erefactor-lazy-highlight--timer
-    (unless (catch 'found
-              (mapc
-               (lambda (buf)
-                 (with-current-buffer buf
-                   (when erefactor-highlight-mode
-                     (throw 'found t))))
-               (buffer-list))
-              nil)
+    (unless (dolist (buf (buffer-list))
+              (with-current-buffer buf
+                (when erefactor-highlight-mode
+                  (return t))))
       (cancel-timer erefactor-lazy-highlight--timer)
       (setq erefactor-lazy-highlight--timer nil))))
 
@@ -1063,9 +1042,8 @@ See variable `erefactor-lint-emacsen'."
 (defun erefactor-flymake-insert-errors (title errs)
   (save-excursion
     (insert title "\n\n")
-    (mapc
-     (lambda (x) (insert x "\n"))
-     errs)))
+    (dolist (x errs)
+      (insert x "\n"))))
 
 (defun erefactor-flymake-err-get-title (x) (nth 0 x))
 (defun erefactor-flymake-err-get-errs (x) (nth 1 x))
@@ -1131,9 +1109,8 @@ See variable `erefactor-lint-emacsen'."
 ;; map
 ;;
 
-(defvar erefactor-map nil)
-
-(unless erefactor-map
+;;;###autoload
+(defvar erefactor-map
   (let ((map (make-sparse-keymap)))
 
     (define-key map "L" 'erefactor-lint-by-emacsen)
@@ -1147,7 +1124,7 @@ See variable `erefactor-lint-emacsen'."
     (define-key map "x" 'erefactor-eval-current-defun)
     (define-key map "?" 'erefactor-flymake-display-errors)
 
-    (setq erefactor-map map)))
+    map))
 
 (defvar erefactor-highlight-map nil)
 
