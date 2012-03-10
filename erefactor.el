@@ -1,10 +1,10 @@
-;;; erefactor.el --- Emacs-Lisp tools
+;;; erefactor.el --- Emacs-Lisp refactoring utilities
 
 ;; Author: Masahiro Hayashi <mhayashi1120@gmail.com>
 ;; Keywords: elisp refactor lint
 ;; URL: http://github.com/mhayashi1120/Emacs-erefactor/raw/master/erefactor.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 0.5.3
+;; Version: 0.5.4
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -81,7 +81,7 @@
 ;; =>
 ;; (hogemacro a) <= `a' is not bounded in this context.
 ;;
-;; * Devide to other elisp file about elint and flymake
+;; * Separate elint and flymake to other elisp file.
 ;;
 ;; * flymake not works emacs-22
 
@@ -145,7 +145,7 @@
     (let ((files (append (erefactor--symbol-using-sources 'defun symbol)
                          (erefactor--symbol-using-sources 'defvar symbol)
                          (erefactor--symbol-using-sources 'defface symbol))))
-      (setq ret (union files ret)))
+      (setq ret (erefactor--union files ret)))
     ret))
 
 (defun erefactor--find-local-binding (name)
@@ -289,6 +289,7 @@
        (symbolp (cadar catch-arg))
        (eq (cadar catch-arg) name)))
 
+;;;###autoload
 (defun erefactor-rename-symbol-in-package (old-name new-name)
   "Rename symbol at point with queries. This affect to current buffer and requiring modules.
 
@@ -310,6 +311,7 @@ the module have observance of `require'/`provide' system.
           (erefactor-after-rename-function))))
      guessed-files)))
 
+;;;###autoload
 (defun erefactor-rename-symbol-in-buffer (old-name new-name)
   "Rename symbol at point resolving reference local variable as long as i can with queries.
 This affect to current buffer."
@@ -321,6 +323,7 @@ This affect to current buffer."
       (setq after (erefactor-after-rename-function)))
     (erefactor-rename-region old-name new-name region nil after)))
 
+;;;###autoload
 (defun erefactor-change-prefix-in-buffer (old-prefix new-prefix)
   "Rename symbol prefix with queries.
 
@@ -354,6 +357,7 @@ This is usefull when creating new definition."
              (buffer-file-name) type name))))
       (message "%s" name))))
 
+;;;###autoload
 (defun erefactor-eval-current-defun (&optional edebug-it)
   "Evaluate current defun and add definition to `load-history'"
   (interactive "P")
@@ -714,6 +718,7 @@ Optional arg AFTER-FUNC is called with two args old-name and new-name after repl
       (error "No difference"))
     (list current-prefix new-prefix)))
 
+;;;###autoload
 (defun erefactor-highlight-current-symbol ()
   "Highlight current symbol in this buffer.
 Force to dehighlight \\[erefactor-dehighlight-all-symbol]"
@@ -757,6 +762,7 @@ In highlight mode, the highlight the current symbol if recognize as a local vari
     (erefactor-lazy-highlight--dehihglight)
     (kill-local-variable 'ahs-face-check-include-overlay))))
 
+;;;###autoload
 (defun erefactor-lazy-highlight-turn-on ()
   (erefactor-highlight-mode 1))
 
@@ -839,8 +845,10 @@ In highlight mode, the highlight the current symbol if recognize as a local vari
 
 (defun erefactor-highlight-move-symbol (forward-p)
   (let* ((ovs (sort (copy-seq erefactor-highlighting-overlays)
-                    `(lambda (x y) (,(if forward-p '< '>) (overlay-start x) (overlay-start y)))))
-         (ov (find-if (lambda (x) (overlay-get x 'erefactor-overlay-p)) (overlays-at (point))))
+                    `(lambda (x y)
+                       (,(if forward-p '< '>) (overlay-start x) (overlay-start y)))))
+         (ov (erefactor--find (lambda (x) (overlay-get x 'erefactor-overlay-p))
+                              (overlays-at (point))))
          (ov2 (cadr (memq ov ovs))))
     (when (or ov2 ovs)
       (let ((next (overlay-start (or ov2 (car ovs)))))
@@ -872,6 +880,7 @@ Examples:
   :group 'erefactor
   :type '(list (list file)))
 
+;;;###autoload
 (defun erefactor-lint ()
   "Execuet Elint in new Emacs process."
   (interactive)
@@ -884,6 +893,7 @@ Examples:
                               (when (eq (process-status p) 'exit)
                                 (erefactor-lint-exit-mode-line p)))))))
 
+;;;###autoload
 (defun erefactor-lint-by-emacsen ()
   "Execuet Elint in new Emacs processes.
 See variable `erefactor-lint-emacsen'."
@@ -1097,6 +1107,17 @@ See variable `erefactor-lint-emacsen'."
 (defun erefactor-mapconcat (func list)
   (apply 'append (mapcar func list)))
 
+(defun erefactor--union (list1 list2)
+  (loop for a in (append list1 list2)
+        unless (member a res)
+        collect a into res
+        finally return res))
+
+(defun erefactor--find (pred list)
+  (loop for a in list
+        if (funcall pred a)
+        return a))
+
 ;;
 ;; other elisp compatibility
 ;;
@@ -1137,6 +1158,9 @@ See variable `erefactor-lint-emacsen'."
     (define-key map (kbd "M-<right>") 'erefactor-highlight-next-symbol)
 
     (setq erefactor-highlight-map map)))
+
+;;;###autoload(add-hook 'emacs-lisp-mode-hook 'erefactor-lazy-highlight-turn-on)
+;;;###autoload(add-hook 'lisp-interaction-mode-hook 'erefactor-lazy-highlight-turn-on)
 
 (provide 'erefactor)
 
