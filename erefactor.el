@@ -4,7 +4,7 @@
 ;; Keywords: elisp refactor lint
 ;; URL: http://github.com/mhayashi1120/Emacs-erefactor/raw/master/erefactor.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 0.5.4
+;; Version: 0.6.0
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -302,7 +302,7 @@ the module have observance of `require'/`provide' system.
     (dolist (file guessed-files)
       (erefactor-with-file file
         (erefactor-rename-region
-         old-name new-name nil nil
+         old-name new-name nil
          (erefactor-after-rename-function))))))
 
 ;;;###autoload
@@ -315,7 +315,7 @@ This affect to current buffer."
         after)
     (unless region
       (setq after (erefactor-after-rename-function)))
-    (erefactor-rename-region old-name new-name region nil after)))
+    (erefactor-rename-region old-name new-name region after)))
 
 ;;;###autoload
 (defun erefactor-change-prefix-in-buffer (old-prefix new-prefix)
@@ -327,8 +327,7 @@ OLD-PREFIX: `foo-' -> NEW-PREFIX: `baz-'
 "
   (interactive
    (erefactor-change-prefix-read-args))
-  (erefactor-change-symbol-prefix old-prefix new-prefix
-                                  nil (erefactor-after-rename-function)))
+  (erefactor-change-symbol-prefix old-prefix new-prefix))
 
 ;;TODO like define-derived-mode
 (defun erefactor-add-current-defun ()
@@ -384,26 +383,18 @@ This is usefull when creating new definition."
     (defface . defface)
     ))
 
-(defvar erefactor-after-rename-function-alist
-  '(
-    (emacs-lisp-mode . erefactor-after-rename-symbol)
-    (lisp-interaction-mode . erefactor-after-rename-symbol)
-    ))
-
-(defun erefactor-after-rename-function ()
-  (cdr (assq major-mode erefactor-after-rename-function-alist)))
-
 (defun erefactor-after-rename-symbol (old-name new-name)
-  (let ((fnsym (erefactor--current-fnsym))
-        (old (intern old-name))
-        (new (intern new-name)))
-    ;; re-define definition.
-    ;; if `defvar' or `defcustom' current value will be cleared.
-    (eval-defun nil)
-    (when (eq (cadr fnsym) new)
-      (let ((type (cdr (assq (car fnsym) erefactor-def-alist))))
-        (when (memq type '(defvar defun defface))
-          (erefactor--change-load-name old new type))))))
+  (save-match-data
+    (let ((fnsym (erefactor--current-fnsym))
+          (old (intern old-name))
+          (new (intern new-name)))
+      ;; re-define definition.
+      ;; if `defvar' or `defcustom' current value will be cleared.
+      (eval-defun nil)
+      (when (eq (cadr fnsym) new)
+        (let ((type (cdr (assq (car fnsym) erefactor-def-alist))))
+          (when (memq type '(defvar defun defface))
+            (erefactor--change-load-name old new type)))))))
 
 (defun erefactor--current-fnsym ()
   (save-excursion
@@ -611,17 +602,12 @@ CHECK is function that accept no arg and return boolean."
         (funcall func old-name capture new-name)
       (y-or-n-p "Rename? "))))
 
-(defun erefactor--call-after (func old-name new-name)
-  (save-match-data
-    (when func
-      (funcall func old-name new-name))))
-
-(defun erefactor-rename-region (symbol new-symbol &optional region before-func after-func)
+(defun erefactor-rename-region (symbol new-symbol &optional region)
   "Rename SYMBOL to NEW-SYMBOL in REGION.
 Optional arg BEFORE-FUNC is not used currently (TODO).
     But called with three args SYMBOL and NEW-SYMBOL before replacing.
     This function must return non-nil value if executing to replace.
-Optional arg AFTER-FUNC is called with two args SYMBOL and NEW-SYMBOL after replaced."
+"
   (let ((start (if region (car region) (point-min)))
         (end (save-excursion
                (goto-char (if region (cdr region) (point-max)))
@@ -643,15 +629,14 @@ Optional arg AFTER-FUNC is called with two args SYMBOL and NEW-SYMBOL after repl
             (unwind-protect
                 (when (erefactor--call-before before-func symbol target new-symbol)
                   (replace-match new-symbol nil nil nil 1)
-                  (erefactor--call-after after-func symbol new-symbol))
+                  (erefactor-after-rename-symbol symbol new-symbol))
               (erefactor-dehighlight-in-interactive))))))))
 
-(defun erefactor-change-symbol-prefix (prefix new-prefix &optional before-func after-func)
+(defun erefactor-change-symbol-prefix (prefix new-prefix)
   "Switch symbol PREFIX to NEW-PREFIX in buffer.
 Optional arg BEFORE-FUNC is not used currently (TODO).
     But called with three args SYMBOL and NEW-SYMBOL before replacing.
-    This function must return non-nil value if executing to replace.
-Optional arg AFTER-FUNC is called with two args old-name and new-name after replaced."
+    This function must return non-nil value if executing to replace."
   (save-excursion
     (setq erefactor--region-start (point-min))
     (setq erefactor--region-end (point-max))
@@ -668,7 +653,7 @@ Optional arg AFTER-FUNC is called with two args old-name and new-name after repl
           (unwind-protect
               (when (erefactor--call-before before-func old-name target new-name)
                 (replace-match new-prefix nil nil nil 2)
-                (erefactor--call-after after-func old-name new-name))
+                (erefactor-after-rename-symbol old-name new-name))
             (erefactor-dehighlight-in-interactive)))))))
 
 (defun erefactor-rename-symbol-read-args ()
