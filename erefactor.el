@@ -301,9 +301,7 @@ the module have observance of `require'/`provide' system.
         (setq guessed-files (cons (buffer-file-name) guessed-files))))
     (dolist (file guessed-files)
       (erefactor-with-file file
-        (erefactor-rename-region
-         old-name new-name nil
-         (erefactor-after-rename-function))))))
+        (erefactor-rename-region old-name new-name)))))
 
 ;;;###autoload
 (defun erefactor-rename-symbol-in-buffer (old-name new-name)
@@ -311,11 +309,8 @@ the module have observance of `require'/`provide' system.
 This affect to current buffer."
   (interactive
    (erefactor-rename-symbol-read-args))
-  (let ((region (erefactor--find-local-binding old-name))
-        after)
-    (unless region
-      (setq after (erefactor-after-rename-function)))
-    (erefactor-rename-region old-name new-name region after)))
+  (let ((region (erefactor--find-local-binding old-name)))
+    (erefactor-rename-region old-name new-name region)))
 
 ;;;###autoload
 (defun erefactor-change-prefix-in-buffer (old-prefix new-prefix)
@@ -329,7 +324,6 @@ OLD-PREFIX: `foo-' -> NEW-PREFIX: `baz-'
    (erefactor-change-prefix-read-args))
   (erefactor-change-symbol-prefix old-prefix new-prefix))
 
-;;TODO like define-derived-mode
 (defun erefactor-add-current-defun ()
   "Add current defun form to `load-history'
 This is usefull when creating new definition."
@@ -340,9 +334,9 @@ This is usefull when creating new definition."
     (end-of-defun)
     (beginning-of-defun)
     (let* ((sexp (read (current-buffer)))
-           (type (cdr (assq (car sexp) erefactor-def-alist)))
+           (types (cdr (assq (car sexp) erefactor-def-alist)))
            (name (cadr sexp)))
-      (when type
+      (dolist (type types)
         (let ((hist (erefactor--find-load-history type name)))
           ;; when not loaded in `load-history'
           (unless hist
@@ -370,17 +364,21 @@ This is usefull when creating new definition."
 (defconst erefactor-def-alist
   '(
     ;; Variable cell
-    (defvar . defvar)
-    (defcustom . defvar)
-    (defconst . defvar)
+    (defvar defvar)
+    (defcustom defvar)
+    (defconst defvar)
 
     ;; Function cell
-    (defun . defun)
-    (defmacro . defun)
-    (defun*  . defun)
-    (defmacro* . defun)
+    (defun defun)
+    (defmacro defun)
+    (defun*  defun)
+    (defmacro* defun)
+    
     ;; Face
-    (defface . defface)
+    (defface defface)
+
+    ;; Misc
+    (define-minor-mode defun defvar)
     ))
 
 (defun erefactor-after-rename-symbol (old-name new-name)
@@ -410,6 +408,7 @@ This is usefull when creating new definition."
       ret)))
 
 (defun erefactor--symbol-defined-alist (symbol)
+  ;; FUNCS FACES VARS have file names.
   (let (funcs faces vars)
     (loop for (file . entries) in load-history
           do (let (tmp)
@@ -426,18 +425,16 @@ This is usefull when creating new definition."
       (defvar . ,vars))))
 
 (defun erefactor--add-load-name (file type symbol)
-  (let ((defs (erefactor--find-load-history type symbol)))
-    ;; When duplicated definition exists, `load-history' simply have duplicated values.
-    (unless defs
-      (let ((hist (assoc file load-history)))
-        (unless hist
-          (error "%s is not loaded" file))
-        (setcdr (last hist)
-                (cond
-                 ((memq type '(defun defface))
-                  (list (cons type symbol)))
-                 ((eq type 'defvar)
-                  (list symbol))))))))
+  ;; When duplicated definition exists, `load-history' simply have duplicated values.
+  (let ((hist (assoc file load-history)))
+    (unless hist
+      (error "%s is not loaded" file))
+    (setcdr (last hist)
+            (cond
+             ((memq type '(defun defface))
+              (list (cons type symbol)))
+             ((eq type 'defvar)
+              (list symbol))))))
 
 (defun erefactor--change-load-name (old-symbol new-symbol type)
   (let ((defs (erefactor--find-load-history type old-symbol)))
@@ -596,18 +593,8 @@ CHECK is function that accept no arg and return boolean."
            (unless (buffer-modified-p buffer)
              (kill-buffer buffer)))))))
 
-(defun erefactor--call-before (func old-name capture new-name)
-  (save-match-data
-    (if func
-        (funcall func old-name capture new-name)
-      (y-or-n-p "Rename? "))))
-
 (defun erefactor-rename-region (symbol new-symbol &optional region)
-  "Rename SYMBOL to NEW-SYMBOL in REGION.
-Optional arg BEFORE-FUNC is not used currently (TODO).
-    But called with three args SYMBOL and NEW-SYMBOL before replacing.
-    This function must return non-nil value if executing to replace.
-"
+  "Rename SYMBOL to NEW-SYMBOL in REGION."
   (let ((start (if region (car region) (point-min)))
         (end (save-excursion
                (goto-char (if region (cdr region) (point-max)))
@@ -627,16 +614,13 @@ Optional arg BEFORE-FUNC is not used currently (TODO).
             (goto-char (match-end 1))
             (erefactor-re-highlight-in-interactive regexp (match-beginning 1) (match-end 1))
             (unwind-protect
-                (when (erefactor--call-before before-func symbol target new-symbol)
+                (when (y-or-n-p "Rename? ")
                   (replace-match new-symbol nil nil nil 1)
                   (erefactor-after-rename-symbol symbol new-symbol))
               (erefactor-dehighlight-in-interactive))))))))
 
 (defun erefactor-change-symbol-prefix (prefix new-prefix)
-  "Switch symbol PREFIX to NEW-PREFIX in buffer.
-Optional arg BEFORE-FUNC is not used currently (TODO).
-    But called with three args SYMBOL and NEW-SYMBOL before replacing.
-    This function must return non-nil value if executing to replace."
+  "Switch symbol PREFIX to NEW-PREFIX in buffer."
   (save-excursion
     (setq erefactor--region-start (point-min))
     (setq erefactor--region-end (point-max))
@@ -651,7 +635,7 @@ Optional arg BEFORE-FUNC is not used currently (TODO).
                (old-name (concat prefix suffix))
                (new-name (concat new-prefix suffix)))
           (unwind-protect
-              (when (erefactor--call-before before-func old-name target new-name)
+              (when (y-or-n-p "Rename? ")
                 (replace-match new-prefix nil nil nil 2)
                 (erefactor-after-rename-symbol old-name new-name))
             (erefactor-dehighlight-in-interactive)))))))
@@ -711,9 +695,9 @@ Force to dehighlight \\[erefactor-dehighlight-all-symbol]"
     (remove-hook 'after-change-functions 'erefactor-dehighlight-after-change)
     (erefactor-dehighlight-all-symbol)))
 
-;;
-;; lazy highlight local variable
-;;
+;;;
+;;; lazy highlight local variable
+;;;
 
 (define-minor-mode erefactor-highlight-mode
   "Toggle highlight mode on or off.
@@ -818,6 +802,96 @@ In highlight mode, the highlight the current symbol if recognize as a local vari
       (let ((next (overlay-start (or ov2 (car ovs)))))
         (when next
           (goto-char next))))))
+
+;;;
+;;; Check simple check for function
+;;;
+
+;;;###autoload
+(define-minor-mode erefactor-check-eval-mode
+  "Display warnings when \\[eval-last-sexp], \\[eval-defun]
+"
+  t nil nil
+  (dolist (x erefactor--check-eval-alist)
+    (let ((enabler
+           (if erefactor-check-eval-mode
+               'ad-enable-advice
+             'ad-disable-advice)))
+      (funcall enabler (nth 0 x) (nth 1 x) (nth 2 x))
+      (funcall 'ad-activate (nth 0 x)))))
+
+(defconst erefactor--check-eval-alist
+  '((eval-last-sexp after erefactor-check-eval-last-sexp)
+    (eval-defun after erefactor-check-eval-defun)))
+
+;;TODO interactivep work?
+(defadvice eval-last-sexp
+  (after erefactor-check-eval-last-sexp (edebug-it) activate)
+  (when (interactive-p)
+    (erefactor--check-form (preceding-sexp))))
+
+;;TODO interactivep work?
+(defadvice eval-defun
+  (after erefactor-check-eval-defun (edebug-it) activate)
+  (when (interactive-p)
+    (unless edebug-it
+      (let ((form (save-excursion
+                    (end-of-defun)
+                    (beginning-of-defun)
+                    (read (current-buffer)))))
+        (erefactor--check-form form)))))
+
+(defun erefactor--check-form (form)
+  (cond
+   ((memq (car-safe form) '(defun defun*))
+    (let ((func (cadr form)))
+      (when (and (symbolp func)
+                 (functionp func))
+        (erefactor--check-function func))))))
+
+(defun erefactor--check-function (function)
+  (let ((warns (erefactor--check-function-warnings function)))
+    (when warns
+      (let ((msg (mapconcat
+                  (lambda (x)
+                    (propertize x 'face font-lock-warning-face))
+                  warns ", ")))
+        (message "%s -> %s" (current-message) msg)
+        (ding)))))
+
+(defun erefactor--check-function-warnings (function)
+  (let ((raw (symbol-function function)))
+    (unwind-protect
+        (let ((buf (get-buffer "*Compile-Log*"))
+              end)
+          (when buf
+            (with-current-buffer buf
+              (setq end (point-max))))
+          ;; inhibit displaying *Compile-Log* window
+          (save-window-excursion
+            (let ((inhibit-redisplay t)
+                  (byte-compile-warnings t)
+                  (byte-compile-unresolved-functions))
+              (byte-compile function)
+              (byte-compile-warn-about-unresolved-functions)))
+          (erefactor--check-gather-warnings end))
+      (fset function raw))))
+
+(defun erefactor--check-gather-warnings (end)
+  (let ((buf (get-buffer "*Compile-Log*"))
+        res)
+    (when buf
+      (with-current-buffer buf
+        (save-excursion
+          (goto-char end)
+          (while (re-search-forward "\\(?:Warning\\|Error\\): \\(.*\\)\\(?:\n +\\(.*\\)\\)?" nil t)
+            (let ((line (concat (match-string 1) (match-string 2))))
+              (setq res (cons line res))))))
+      (nreverse res))))
+
+;;;
+;;; Asynchronous Elint
+;;;
 
 (defcustom erefactor-lint-emacsen nil
   "*Emacs executables.
