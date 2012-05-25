@@ -373,7 +373,7 @@ This is usefull when creating new definition."
     (defmacro defun)
     (defun*  defun)
     (defmacro* defun)
-    
+
     ;; Face
     (defface defface)
 
