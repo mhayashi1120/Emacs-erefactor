@@ -4,7 +4,7 @@
 ;; Keywords: elisp refactor lint
 ;; URL: http://github.com/mhayashi1120/Emacs-erefactor/raw/master/erefactor.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 0.6.0
+;; Version: 0.6.1
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -388,7 +388,11 @@ This is usefull when creating new definition."
           (new (intern new-name)))
       ;; re-define definition.
       ;; if `defvar' or `defcustom' current value will be cleared.
-      (eval-defun nil)
+      (condition-case err
+          (eval-defun nil)
+        (error
+         (message "%s" err)
+         (sit-for 0.1)))
       (when (eq (cadr fnsym) new)
         (let ((type (cdr (assq (car fnsym) erefactor-def-alist))))
           (when (memq type '(defvar defun defface))
@@ -824,17 +828,17 @@ In highlight mode, the highlight the current symbol if recognize as a local vari
   '((eval-last-sexp after erefactor-check-eval-last-sexp)
     (eval-defun after erefactor-check-eval-defun)))
 
-;;TODO interactivep work?
 (defadvice eval-last-sexp
   (after erefactor-check-eval-last-sexp (edebug-it) activate)
   (when (interactive-p)
+    ;; call `preceding-sexp' same as `eval-last-sexp'
     (erefactor--check-form (preceding-sexp))))
 
-;;TODO interactivep work?
 (defadvice eval-defun
   (after erefactor-check-eval-defun (edebug-it) activate)
   (when (interactive-p)
     (unless edebug-it
+      ;; get FORM same as `eval-defun'
       (let ((form (save-excursion
                     (end-of-defun)
                     (beginning-of-defun)
