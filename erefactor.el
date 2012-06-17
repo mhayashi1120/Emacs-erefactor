@@ -161,7 +161,8 @@
               (let* ((start (point-marker))
                      (form (read (current-buffer)))
                      (end (point-marker))
-                     (special-bind (erefactor--special-binding symbol form history)))
+                     (special-bind (erefactor--special-binding
+                                    symbol form history)))
                 ;; detect looping
                 ;; list start char by syntax-table
                 (when (and previous (= (car previous) start))
@@ -287,7 +288,8 @@
 
 ;;;###autoload
 (defun erefactor-rename-symbol-in-package (old-name new-name)
-  "Rename symbol at point with queries. This affect to current buffer and requiring modules.
+  "Rename symbol at point with queries.
+This affect to current buffer and requiring modules.
 
 Please remember, this function only works well if
 the module have observance of `require'/`provide' system.
@@ -305,8 +307,8 @@ the module have observance of `require'/`provide' system.
 
 ;;;###autoload
 (defun erefactor-rename-symbol-in-buffer (old-name new-name)
-  "Rename symbol at point resolving reference local variable as long as i can with queries.
-This affect to current buffer."
+  "Rename symbol at point resolving reference local variable
+as long as i can with queries. This affect to current buffer."
   (interactive
    (erefactor-rename-symbol-read-args))
   (let ((region (erefactor--find-local-binding old-name)))
@@ -429,7 +431,8 @@ This is usefull when creating new definition."
       (defvar . ,vars))))
 
 (defun erefactor--add-load-name (file type symbol)
-  ;; When duplicated definition exists, `load-history' simply have duplicated values.
+  ;; When duplicated definition exists, `load-history' simply have
+  ;; duplicated values.
   (let ((hist (assoc file load-history)))
     (unless hist
       (error "%s is not loaded" file))
@@ -520,7 +523,8 @@ This is usefull when creating new definition."
 
 (defun erefactor-create-prefixed-regexp (prefix)
   "Create matching to PREFIX exclusive regexp."
-  (format "\\_<\\(\\(%s\\)\\(\\(?:\\s_\\|\\sw\\)+\\)\\)\\_>" (regexp-quote prefix)))
+  (format "\\_<\\(\\(%s\\)\\(\\(?:\\s_\\|\\sw\\)+\\)\\)\\_>"
+          (regexp-quote prefix)))
 
 (defun erefactor-dehighlight-in-interactive ()
   "Dehighlight text by `erefactor-re-highlight-in-interactive'."
@@ -535,7 +539,8 @@ This is usefull when creating new definition."
   (if (overlayp erefactor--overlay)
       (move-overlay erefactor--overlay beg fin (current-buffer))
     (setq erefactor--overlay (make-overlay beg fin))
-    (overlay-put erefactor--overlay 'priority 100) ; higher than erefactor-highlight-face
+    ;; higher than erefactor-highlight-face
+    (overlay-put erefactor--overlay 'priority 100) 
     (overlay-put erefactor--overlay 'face 'query-replace))
   ;; highlight scheduled replacing text.
   (erefactor-highlight-update-region
@@ -611,12 +616,14 @@ CHECK is function that accept no arg and return boolean."
         (setq erefactor--region-end end)
         (goto-char start)
         (setq regexp (erefactor-create-regexp symbol))
-        ;; cannot use narrow-to-region because is unnatural while interactive loop
+        ;; cannot use narrow-to-region because is unnatural while
+        ;; interactive loop
         (while (and (re-search-forward regexp nil t)
                     (< (point) end))
           (let ((target (match-string 0)))
             (goto-char (match-end 1))
-            (erefactor-re-highlight-in-interactive regexp (match-beginning 1) (match-end 1))
+            (erefactor-re-highlight-in-interactive
+             regexp (match-beginning 1) (match-end 1))
             (unwind-protect
                 (when (y-or-n-p "Rename? ")
                   (replace-match new-symbol nil nil nil 1)
@@ -630,10 +637,12 @@ CHECK is function that accept no arg and return boolean."
     (setq erefactor--region-end (point-max))
     (goto-char (point-min))
     (let ((regexp (erefactor-create-prefixed-regexp prefix)))
-      ;; cannot use narrow-to-region because is unnatural while interactive loop
+      ;; cannot use narrow-to-region because is unnatural while
+      ;; interactive loop
       (while (re-search-forward regexp nil t)
         (goto-char (match-end 1))
-        (erefactor-re-highlight-in-interactive regexp (match-beginning 2) (match-end 2))
+        (erefactor-re-highlight-in-interactive
+        regexp (match-beginning 2) (match-end 2))
         (let* ((target (match-string 0))
                (suffix (match-string 3))
                (old-name (concat prefix suffix))
@@ -705,7 +714,8 @@ Force to dehighlight \\[erefactor-dehighlight-all-symbol]"
 
 (define-minor-mode erefactor-highlight-mode
   "Toggle highlight mode on or off.
-In highlight mode, the highlight the current symbol if recognize as a local variable.
+In highlight mode, the highlight the current symbol if recognize
+as a local variable.
 "
   :group 'erefactor
   (cond
@@ -798,7 +808,9 @@ In highlight mode, the highlight the current symbol if recognize as a local vari
 (defun erefactor-highlight-move-symbol (forward-p)
   (let* ((ovs (sort (copy-seq erefactor-highlighting-overlays)
                     `(lambda (x y)
-                       (,(if forward-p '< '>) (overlay-start x) (overlay-start y)))))
+                       (,(if forward-p '< '>)
+                        (overlay-start x)
+                        (overlay-start y)))))
          (ov (erefactor--find (lambda (x) (overlay-get x 'erefactor-overlay-p))
                               (overlays-at (point))))
          (ov2 (cadr (memq ov ovs))))
@@ -972,7 +984,8 @@ See variable `erefactor-lint-emacsen'."
            (msg  (format " (Exit [%d])" code)))
       (setq mode-line-process
             (propertize msg 'face
-                        (if (= code 0) 'compilation-info 'compilation-error))))))
+                        (if (= code 0)
+                            'compilation-info 'compilation-error))))))
 
 (defun erefactor-lint-internal (command file)
   (let* ((args (erefactor-lint-command-args command file))
@@ -983,7 +996,8 @@ See variable `erefactor-lint-emacsen'."
       (let ((proc (apply 'start-process "Async Elint" (current-buffer)
                          command args)))
         (set-process-sentinel proc (lambda (p e)))
-        (setq mode-line-process (propertize " (Running)" 'face 'compilation-warning))
+        (setq mode-line-process 
+              (propertize " (Running)" 'face 'compilation-warning))
         proc))))
 
 (defun erefactor-lint-initialize ()
