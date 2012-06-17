@@ -4,7 +4,7 @@
 ;; Keywords: elisp refactor lint
 ;; URL: http://github.com/mhayashi1120/Emacs-erefactor/raw/master/erefactor.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 0.6.1
+;; Version: 0.6.2
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -373,7 +373,7 @@ This is usefull when creating new definition."
     (defmacro defun)
     (defun*  defun)
     (defmacro* defun)
-    
+
     ;; Face
     (defface defface)
 
@@ -813,7 +813,7 @@ In highlight mode, the highlight the current symbol if recognize as a local vari
 
 ;;;###autoload
 (define-minor-mode erefactor-check-eval-mode
-  "Display warnings when \\[eval-last-sexp], \\[eval-defun]
+  "Display compiling warnings when \\[eval-last-sexp], \\[eval-defun]
 "
   t nil nil
   (dolist (x erefactor--check-eval-alist)
@@ -824,7 +824,7 @@ In highlight mode, the highlight the current symbol if recognize as a local vari
       (funcall enabler (nth 0 x) (nth 1 x) (nth 2 x))
       (funcall 'ad-activate (nth 0 x)))))
 
-(defconst erefactor--check-eval-alist
+(defvar erefactor--check-eval-alist
   '((eval-last-sexp after erefactor-check-eval-last-sexp)
     (eval-defun after erefactor-check-eval-defun)))
 
