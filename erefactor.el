@@ -540,7 +540,7 @@ This is usefull when creating new definition."
       (move-overlay erefactor--overlay beg fin (current-buffer))
     (setq erefactor--overlay (make-overlay beg fin))
     ;; higher than erefactor-highlight-face
-    (overlay-put erefactor--overlay 'priority 100) 
+    (overlay-put erefactor--overlay 'priority 100)
     (overlay-put erefactor--overlay 'face 'query-replace))
   ;; highlight scheduled replacing text.
   (erefactor-highlight-update-region
@@ -621,7 +621,7 @@ CHECK is function that accept no arg and return boolean."
         (while (and (re-search-forward regexp nil t)
                     (< (point) end))
           ;; to protect destroying match
-          (let ((target (match-data)))  
+          (let ((target (match-data)))
             (goto-char (match-end 1))
             (erefactor-re-highlight-in-interactive
              regexp (match-beginning 1) (match-end 1))
@@ -1001,7 +1001,7 @@ See variable `erefactor-lint-emacsen'."
       (let ((proc (apply 'start-process "Async Elint" (current-buffer)
                          command args)))
         (set-process-sentinel proc (lambda (p e)))
-        (setq mode-line-process 
+        (setq mode-line-process
               (propertize " (Running)" 'face 'compilation-warning))
         proc))))
 
