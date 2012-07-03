@@ -4,7 +4,7 @@
 ;; Keywords: elisp refactor lint
 ;; URL: http://github.com/mhayashi1120/Emacs-erefactor/raw/master/erefactor.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 0.6.2
+;; Version: 0.6.3
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -142,9 +142,10 @@
            (add-to-list 'ret file)))
        obarray))
     ;;TODO refactor
-    (let ((files (append (erefactor--symbol-using-sources 'defun symbol)
-                         (erefactor--symbol-using-sources 'defvar symbol)
-                         (erefactor--symbol-using-sources 'defface symbol))))
+    (let ((files (append
+                  (erefactor--symbol-using-sources 'defun symbol)
+                  (erefactor--symbol-using-sources 'defvar symbol)
+                  (erefactor--symbol-using-sources 'defface symbol))))
       (setq ret (erefactor--union files ret)))
     ret))
 
@@ -204,7 +205,7 @@
 
 (defun erefactor--local-binding-p (name form)
   (or
-   ;; todo difference between let and let*
+   ;; FIXME: difference between let and let*
    (and (memq (car-safe form) '(let let* lexical-let lexical-let*))
         (erefactor--let-binding-contains-p (cadr form) name))
    (and (memq (car-safe form) '(defun defmacro))
@@ -477,7 +478,7 @@ This is usefull when creating new definition."
         (when tmp
           (return tmp))))))
 
-;;TODO merge to erefactor--guessed-using-files
+;; get a sources that is defined SYMBOL as TYPE
 (defun erefactor--symbol-using-sources (type symbol)
   (let ((package (erefactor--symbol-package type symbol)))
     (loop for defs in load-history
@@ -540,7 +541,7 @@ This is usefull when creating new definition."
       (move-overlay erefactor--overlay beg fin (current-buffer))
     (setq erefactor--overlay (make-overlay beg fin))
     ;; higher than erefactor-highlight-face
-    (overlay-put erefactor--overlay 'priority 100) 
+    (overlay-put erefactor--overlay 'priority 100)
     (overlay-put erefactor--overlay 'face 'query-replace))
   ;; highlight scheduled replacing text.
   (erefactor-highlight-update-region
@@ -621,7 +622,7 @@ CHECK is function that accept no arg and return boolean."
         (while (and (re-search-forward regexp nil t)
                     (< (point) end))
           ;; to protect destroying match
-          (let ((target (match-data)))  
+          (let ((target (match-data)))
             (goto-char (match-end 1))
             (erefactor-re-highlight-in-interactive
              regexp (match-beginning 1) (match-end 1))
@@ -726,7 +727,7 @@ as a local variable.
   (cond
    (erefactor-highlight-mode
     (erefactor-lazy-highlight--start)
-    ;; TODO suppress auto-highlight
+    ;; FIXME suppress auto-highlight (auto-highlight-symbol.el)
     (set (make-local-variable 'ahs-face-check-include-overlay) t))
    (t
     (erefactor-lazy-highlight--stop)
@@ -1001,7 +1002,7 @@ See variable `erefactor-lint-emacsen'."
       (let ((proc (apply 'start-process "Async Elint" (current-buffer)
                          command args)))
         (set-process-sentinel proc (lambda (p e)))
-        (setq mode-line-process 
+        (setq mode-line-process
               (propertize " (Running)" 'face 'compilation-warning))
         proc))))
 
