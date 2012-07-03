@@ -620,12 +620,15 @@ CHECK is function that accept no arg and return boolean."
         ;; interactive loop
         (while (and (re-search-forward regexp nil t)
                     (< (point) end))
-          (let ((target (match-string 0)))
+          ;; to protect destroying match
+          (let ((target (match-data)))  
             (goto-char (match-end 1))
             (erefactor-re-highlight-in-interactive
              regexp (match-beginning 1) (match-end 1))
             (unwind-protect
                 (when (y-or-n-p "Rename? ")
+                  ;; restore match data (timer maybe destroy match-data)
+                  (set-match-data target)
                   (replace-match new-symbol nil nil nil 1)
                   (erefactor-after-rename-symbol symbol new-symbol))
               (erefactor-dehighlight-in-interactive))))))))
@@ -640,18 +643,20 @@ CHECK is function that accept no arg and return boolean."
       ;; cannot use narrow-to-region because is unnatural while
       ;; interactive loop
       (while (re-search-forward regexp nil t)
-        (goto-char (match-end 1))
-        (erefactor-re-highlight-in-interactive
-        regexp (match-beginning 2) (match-end 2))
-        (let* ((target (match-string 0))
-               (suffix (match-string 3))
-               (old-name (concat prefix suffix))
-               (new-name (concat new-prefix suffix)))
-          (unwind-protect
-              (when (y-or-n-p "Rename? ")
-                (replace-match new-prefix nil nil nil 2)
-                (erefactor-after-rename-symbol old-name new-name))
-            (erefactor-dehighlight-in-interactive)))))))
+        (let ((target (match-data))
+              (suffix (match-string 3)))
+          (goto-char (match-end 1))
+          (erefactor-re-highlight-in-interactive
+           regexp (match-beginning 2) (match-end 2))
+          (let* ((old-name (concat prefix suffix))
+                 (new-name (concat new-prefix suffix)))
+            (unwind-protect
+                (when (y-or-n-p "Rename? ")
+                  ;; restore match data (timer maybe destroy match-data)
+                  (set-match-data target)
+                  (replace-match new-prefix nil nil nil 2)
+                  (erefactor-after-rename-symbol old-name new-name))
+              (erefactor-dehighlight-in-interactive))))))))
 
 (defun erefactor-rename-symbol-read-args ()
   (let (current-name prompt new-name)
