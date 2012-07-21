@@ -61,6 +61,11 @@
 ;;             ex: '(hoge-var hoge-func) -> '(foo-var foo-func)
 ;; C-c C-v ? : Display flymake elint warnings/errors
 
+;; * To show compilation warnings when evaluate `defun' form.
+;;
+;;   M-x erefactor-check-eval-mode
+
+
 ;;; TODO:
 ;; * Change only same case if symbol. But docstring is not.
 ;;
@@ -72,6 +77,8 @@
 ;;   "REGION is REGION."
 ;;   region)
 ;;
+;;  don't forget about `quoted' symbol.
+
 ;; * macroexpand misunderstand local variable
 ;;
 ;; (defmacro hogemacro (&rest form)
