@@ -4,7 +4,7 @@
 ;; Keywords: elisp refactor lint
 ;; URL: http://github.com/mhayashi1120/Emacs-erefactor/raw/master/erefactor.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 0.6.3
+;; Version: 0.6.4
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -870,6 +870,35 @@ as a local variable.
                     (read (current-buffer)))))
         (erefactor--check-form form)))))
 
+(defun erefactor--closure-pseudo-source (closure)
+  (let ((code (erefactor--expand-closure closure)))
+    (with-output-to-string
+      (dolist (c code)
+        (pp c)))))
+
+;; hack function ;-)
+(defun erefactor--expand-closure (closure)
+  (unless (eq (car-safe closure) 'closure)
+    (error "Not a closure"))
+  (let ((env (nth 1 closure))
+        (vars (nth 2 closure))
+        (body (nthcdr 3 closure)))
+    (let ((let-vars nil)
+          (def-vars nil))
+      (mapc
+       (lambda (v)
+         (cond
+          ((consp v)
+           (push (list (car v) (cdr v)) let-vars))
+          ((eq v t))
+          ((symbolp v)
+           (push v def-vars))
+          (t (error "TODO2"))))
+       env)
+      (append
+       (mapcar (lambda (v) `(defvar ,v)) def-vars)
+       `((let ,let-vars (defun dummy ,vars ,@body)))))))
+
 (defun erefactor--check-form (form)
   (cond
    ((memq (car-safe form) '(defun defun*))
@@ -901,9 +930,18 @@ as a local variable.
             (let ((inhibit-redisplay t)
                   (byte-compile-warnings t)
                   (byte-compile-unresolved-functions))
-              (byte-compile function)
+              (cond
+               ((eq (car-safe raw) 'closure)
+                (let ((code (erefactor--closure-pseudo-source raw)))
+                  (with-temp-buffer
+                    (insert code)
+                    (let ((lexical-binding t))
+                      (byte-compile-from-buffer (current-buffer))))))
+               (t
+                (byte-compile function)))
               (byte-compile-warn-about-unresolved-functions)))
           (erefactor--check-gather-warnings end))
+      ;; restore function body
       (fset function raw))))
 
 (defun erefactor--check-gather-warnings (end)
