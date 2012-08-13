@@ -4,7 +4,7 @@
 ;; Keywords: elisp refactor lint
 ;; URL: http://github.com/mhayashi1120/Emacs-erefactor/raw/master/erefactor.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 0.6.2
+;; Version: 0.6.4
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -61,6 +61,11 @@
 ;;             ex: '(hoge-var hoge-func) -> '(foo-var foo-func)
 ;; C-c C-v ? : Display flymake elint warnings/errors
 
+;; * To show compilation warnings when evaluate `defun' form.
+;;
+;;   M-x erefactor-check-eval-mode
+
+
 ;;; TODO:
 ;; * Change only same case if symbol. But docstring is not.
 ;;
@@ -72,6 +77,8 @@
 ;;   "REGION is REGION."
 ;;   region)
 ;;
+;;  don't forget about `quoted' symbol.
+
 ;; * macroexpand misunderstand local variable
 ;;
 ;; (defmacro hogemacro (&rest form)
@@ -142,9 +149,10 @@
            (add-to-list 'ret file)))
        obarray))
     ;;TODO refactor
-    (let ((files (append (erefactor--symbol-using-sources 'defun symbol)
-                         (erefactor--symbol-using-sources 'defvar symbol)
-                         (erefactor--symbol-using-sources 'defface symbol))))
+    (let ((files (append
+                  (erefactor--symbol-using-sources 'defun symbol)
+                  (erefactor--symbol-using-sources 'defvar symbol)
+                  (erefactor--symbol-using-sources 'defface symbol))))
       (setq ret (erefactor--union files ret)))
     ret))
 
@@ -204,7 +212,7 @@
 
 (defun erefactor--local-binding-p (name form)
   (or
-   ;; todo difference between let and let*
+   ;; FIXME: difference between let and let*
    (and (memq (car-safe form) '(let let* lexical-let lexical-let*))
         (erefactor--let-binding-contains-p (cadr form) name))
    (and (memq (car-safe form) '(defun defmacro))
@@ -477,7 +485,7 @@ This is usefull when creating new definition."
         (when tmp
           (return tmp))))))
 
-;;TODO merge to erefactor--guessed-using-files
+;; get a sources that is defined SYMBOL as TYPE
 (defun erefactor--symbol-using-sources (type symbol)
   (let ((package (erefactor--symbol-package type symbol)))
     (loop for defs in load-history
@@ -726,7 +734,7 @@ as a local variable.
   (cond
    (erefactor-highlight-mode
     (erefactor-lazy-highlight--start)
-    ;; TODO suppress auto-highlight
+    ;; FIXME suppress auto-highlight (auto-highlight-symbol.el)
     (set (make-local-variable 'ahs-face-check-include-overlay) t))
    (t
     (erefactor-lazy-highlight--stop)
@@ -862,6 +870,35 @@ as a local variable.
                     (read (current-buffer)))))
         (erefactor--check-form form)))))
 
+(defun erefactor--closure-pseudo-source (closure)
+  (let ((code (erefactor--expand-closure closure)))
+    (with-output-to-string
+      (dolist (c code)
+        (pp c)))))
+
+;; hack function ;-)
+(defun erefactor--expand-closure (closure)
+  (unless (eq (car-safe closure) 'closure)
+    (error "Not a closure"))
+  (let ((env (nth 1 closure))
+        (vars (nth 2 closure))
+        (body (nthcdr 3 closure)))
+    (let ((let-vars nil)
+          (def-vars nil))
+      (mapc
+       (lambda (v)
+         (cond
+          ((consp v)
+           (push (list (car v) (cdr v)) let-vars))
+          ((eq v t))
+          ((symbolp v)
+           (push v def-vars))
+          (t (error "TODO2"))))
+       env)
+      (append
+       (mapcar (lambda (v) `(defvar ,v)) def-vars)
+       `((let ,let-vars (defun dummy ,vars ,@body)))))))
+
 (defun erefactor--check-form (form)
   (cond
    ((memq (car-safe form) '(defun defun*))
@@ -893,9 +930,18 @@ as a local variable.
             (let ((inhibit-redisplay t)
                   (byte-compile-warnings t)
                   (byte-compile-unresolved-functions))
-              (byte-compile function)
+              (cond
+               ((eq (car-safe raw) 'closure)
+                (let ((code (erefactor--closure-pseudo-source raw)))
+                  (with-temp-buffer
+                    (insert code)
+                    (let ((lexical-binding t))
+                      (byte-compile-from-buffer (current-buffer))))))
+               (t
+                (byte-compile function)))
               (byte-compile-warn-about-unresolved-functions)))
           (erefactor--check-gather-warnings end))
+      ;; restore function body
       (fset function raw))))
 
 (defun erefactor--check-gather-warnings (end)
