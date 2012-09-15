@@ -4,7 +4,7 @@
 ;; Keywords: elisp refactor lint
 ;; URL: http://github.com/mhayashi1120/Emacs-erefactor/raw/master/erefactor.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 0.6.4
+;; Version: 0.6.5
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -531,7 +531,7 @@ This is usefull when creating new definition."
 
 (defun erefactor-create-prefixed-regexp (prefix)
   "Create matching to PREFIX exclusive regexp."
-  (format "\\_<\\(\\(%s\\)\\(\\(?:\\s_\\|\\sw\\)+\\)\\)\\_>"
+  (format "\\_<\\(\\(%s\\)\\(\\(?:\\s_\\|\\sw\\)*\\)\\)\\_>"
           (regexp-quote prefix)))
 
 (defun erefactor-dehighlight-in-interactive ()
@@ -637,7 +637,7 @@ CHECK is function that accept no arg and return boolean."
                 (when (y-or-n-p "Rename? ")
                   ;; restore match data (timer maybe destroy match-data)
                   (set-match-data target)
-                  (replace-match new-symbol nil nil nil 1)
+                  (replace-match new-symbol t nil nil 1)
                   (erefactor-after-rename-symbol symbol new-symbol))
               (erefactor-dehighlight-in-interactive))))))))
 
@@ -662,7 +662,7 @@ CHECK is function that accept no arg and return boolean."
                 (when (y-or-n-p "Rename? ")
                   ;; restore match data (timer maybe destroy match-data)
                   (set-match-data target)
-                  (replace-match new-prefix nil nil nil 2)
+                  (replace-match new-prefix t nil nil 2)
                   (erefactor-after-rename-symbol old-name new-name))
               (erefactor-dehighlight-in-interactive))))))))
 
@@ -901,7 +901,7 @@ as a local variable.
 
 (defun erefactor--check-form (form)
   (cond
-   ((memq (car-safe form) '(defun defun*))
+   ((memq (car-safe form) '(defun defun* defsubst))
     (let ((func (cadr form)))
       (when (and (symbolp func)
                  (functionp func))
