@@ -1,10 +1,10 @@
 ;;; erefactor.el --- Emacs-Lisp refactoring utilities
 
 ;; Author: Masahiro Hayashi <mhayashi1120@gmail.com>
-;; Keywords: elisp refactor lint
+;; Keywords: extensions, tools, maint
 ;; URL: http://github.com/mhayashi1120/Emacs-erefactor/raw/master/erefactor.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 0.6.5
+;; Version: 0.6.7
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -361,15 +361,6 @@ This is usefull when creating new definition."
   (eval-defun edebug-it)
   (when buffer-file-name
     (erefactor-add-current-defun)))
-
-;; (defun erefactor-before-rename-symbol (old-name captured new-name)
-;;   (cond
-;;    ((erefactor-context-code-p)
-;;     ;; ignore if case is different
-;;     (when (string= old-name captured)
-;;       (y-or-n-p "Rename? ")))
-;;    (t
-;;     (y-or-n-p "Replace? "))))
 
 (defconst erefactor-def-alist
   '(
@@ -836,6 +827,17 @@ as a local variable.
 ;;; Check simple check for function
 ;;;
 
+(defmacro erefactor-interactive-p ()
+  (cond
+   ((= emacs-major-version 21)
+    `(interactive-p))
+   ((or (= emacs-major-version 22)
+        (and (version<= emacs-version "23.2")
+             (not (version= emacs-version "23.2"))))
+    `(called-interactively-p))
+   (t
+    `(called-interactively-p 'any))))
+
 ;;;###autoload
 (define-minor-mode erefactor-check-eval-mode
   "Display compiling warnings when \\[eval-last-sexp], \\[eval-defun]
@@ -855,13 +857,13 @@ as a local variable.
 
 (defadvice eval-last-sexp
   (after erefactor-check-eval-last-sexp (edebug-it) activate)
-  (when (interactive-p)
+  (when (erefactor-interactive-p)
     ;; call `preceding-sexp' same as `eval-last-sexp'
     (erefactor--check-form (preceding-sexp))))
 
 (defadvice eval-defun
   (after erefactor-check-eval-defun (edebug-it) activate)
-  (when (interactive-p)
+  (when (erefactor-interactive-p)
     (unless edebug-it
       ;; get FORM same as `eval-defun'
       (let ((form (save-excursion
