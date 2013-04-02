@@ -23,9 +23,7 @@
 
 ;;; Commentary:
 
-;; Following utilities for Emacs-Lisp.
-;; * Refactoring.
-;; * Lint.
+;; Simple refactoring, linting utilities for Emacs-Lisp.
 
 ;;; Install:
 
