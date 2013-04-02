@@ -4,7 +4,7 @@
 ;; Keywords: extensions, tools, maint
 ;; URL: http://github.com/mhayashi1120/Emacs-erefactor/raw/master/erefactor.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 0.6.7
+;; Version: 0.6.8
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -270,6 +270,7 @@
 
 (defun erefactor--lambda-binding-contains-p (lambda-arg name)
   (and (not (memq name '(&optional &rest)))
+       (consp lambda-arg)
        (memq name lambda-arg)))
 
 (defun erefactor--eieio-defmethod-contains-p (method-arg name)
