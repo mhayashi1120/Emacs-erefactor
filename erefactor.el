@@ -146,7 +146,6 @@
              (setq file (match-string 1 file)))
            (add-to-list 'ret file)))
        obarray))
-    ;;TODO refactor
     (let ((files (append
                   (erefactor--symbol-using-sources 'defun symbol)
                   (erefactor--symbol-using-sources 'defvar symbol)
@@ -897,7 +896,7 @@ as a local variable.
           ((eq v t))
           ((symbolp v)
            (push v def-vars))
-          (t (error "TODO2"))))
+          (t (error "Not yet supported %s" v))))
        env)
       (append
        (mapcar (lambda (v) `(defvar ,v)) def-vars)
