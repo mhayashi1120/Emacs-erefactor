@@ -4,7 +4,7 @@
 ;; Keywords: extensions, tools, maint
 ;; URL: http://github.com/mhayashi1120/Emacs-erefactor/raw/master/erefactor.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 0.6.9
+;; Version: 0.6.10
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -301,8 +301,7 @@
 This affect to current buffer and requiring modules.
 
 Please remember, this function only works well if
-the module have observance of `require'/`provide' system.
-"
+the module have observance of `require'/`provide' system."
   (interactive
    (erefactor-rename-symbol-read-args))
   (let* ((symbol (intern-soft old-name))
@@ -329,8 +328,7 @@ as long as i can with queries. This affect to current buffer."
 
 OLD-PREFIX: `foo-' -> NEW-PREFIX: `baz-'
 `foo-function1' -> `baz-function1'
-`foo-variable1' -> `baz-variable1'
-"
+`foo-variable1' -> `baz-variable1'"
   (interactive
    (erefactor-change-prefix-read-args))
   (erefactor-change-symbol-prefix old-prefix new-prefix))
@@ -363,7 +361,8 @@ This is usefull when creating new definition."
   (when buffer-file-name
     (erefactor-add-current-defun)))
 
-(defconst erefactor-def-alist
+;; list only generally using
+(defvar erefactor-def-alist
   '(
     ;; Variable cell
     (defvar defvar)
@@ -395,9 +394,11 @@ This is usefull when creating new definition."
         (error
          (message "%s" err)
          (sit-for 0.1)))
+      ;; after renaming is succeeded
       (when (eq (cadr fnsym) new)
-        (let ((type (cdr (assq (car fnsym) erefactor-def-alist))))
-          (when (memq type '(defvar defun defface))
+        (let ((types (cdr (assq (car fnsym) erefactor-def-alist))))
+          ;; try to change `load-history'
+          (dolist (type types)
             (erefactor--change-load-name old new type)))))))
 
 (defun erefactor--current-fnsym ()
