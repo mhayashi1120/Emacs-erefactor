@@ -4,7 +4,7 @@
 ;; Keywords: extensions, tools, maint
 ;; URL: http://github.com/mhayashi1120/Emacs-erefactor/raw/master/erefactor.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 0.6.10
+;; Version: 0.6.11
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -1198,7 +1198,7 @@ See variable `erefactor-lint-emacsen'."
   (and
    (symbolp symbol)
    (fboundp symbol)
-   (eq (car-safe (symbol-function symbol)) 'macro)))
+   (eq (car-safe (indirect-function symbol)) 'macro)))
 
 (defun erefactor-ref (key list)
   (cdr (assoc key list)))
