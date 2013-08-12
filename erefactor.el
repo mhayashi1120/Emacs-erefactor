@@ -2,7 +2,7 @@
 
 ;; Author: Masahiro Hayashi <mhayashi1120@gmail.com>
 ;; Keywords: extensions, tools, maint
-;; URL: http://github.com/mhayashi1120/Emacs-erefactor/raw/master/erefactor.el
+;; URL: https://github.com/mhayashi1120/Emacs-erefactor/raw/master/erefactor.el
 ;; Emacs: GNU Emacs 22 or later
 ;; Version: 0.6.11
 
@@ -31,9 +31,9 @@
 ;; and byte compile its if desired.
 ;; And put the following expression into your ~/.emacs.
 ;;
-;;     (require 'erefactor)
-;;     (add-hook 'emacs-lisp-mode-hook
-;;        (lambda ()
+;;     (eval-after-load 'lisp-mode
+;;       '(progn
+;;          (require 'erefactor)
 ;;          (define-key emacs-lisp-mode-map "\C-c\C-v" erefactor-map)))
 ;;
 ;; And set these variables correctly.
