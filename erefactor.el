@@ -955,25 +955,25 @@ Examples:
   :group 'erefactor
   :type '(list (list file)))
 
-(defun erefactor-lint-running-p ()
-  (let ((buffer (erefactor-lint-get-buffer)))
+(defun erefactor-lint--running-p ()
+  (let ((buffer (erefactor-lint--get-buffer)))
     (get-buffer-process buffer)))
 
-(defun erefactor-lint-async (file commands)
+(defun erefactor-lint--async (file commands)
   (let ((command (car commands))
         (rest (cdr commands)))
-    (let ((proc (erefactor-lint-internal command file)))
+    (let ((proc (erefactor-lint--internal command file)))
       (set-process-sentinel
        proc
        `(lambda (p e)
           (when (eq (process-status p) 'exit)
             (with-current-buffer (process-buffer p)
-              (erefactor-lint-append "\n\n")
-              (erefactor-lint-exit-mode-line p))
+              (erefactor-lint--append "\n\n")
+              (erefactor-lint--exit-mode-line p))
             (when ',rest
-              (erefactor-lint-async ,file ',rest))))))))
+              (erefactor-lint--async ,file ',rest))))))))
 
-(defun erefactor-lint-exit-mode-line (process)
+(defun erefactor-lint--exit-mode-line (process)
   (with-current-buffer (process-buffer process)
     (let* ((code (process-exit-status process))
            (msg  (format " (Exit [%d])" code)))
@@ -982,12 +982,12 @@ Examples:
                         (if (= code 0)
                             'compilation-info 'compilation-error))))))
 
-(defun erefactor-lint-internal (command file)
-  (let* ((args (erefactor-lint-command-args command file))
-         (buffer (erefactor-lint-get-buffer)))
+(defun erefactor-lint--internal (command file)
+  (let* ((args (erefactor-lint--command-args command file))
+         (buffer (erefactor-lint--get-buffer)))
     (display-buffer buffer)
     (with-current-buffer buffer
-      (erefactor-lint-append (format "----- Linting by %s -----\n" command))
+      (erefactor-lint--append (format "----- Linting by %s -----\n" command))
       (let ((proc (apply 'start-process "Async Elint" (current-buffer)
                          command args)))
         (set-process-sentinel proc (lambda (p e)))
@@ -995,13 +995,13 @@ Examples:
               (propertize " (Running)" 'face 'compilation-warning))
         proc))))
 
-(defun erefactor-lint-initialize ()
-  (with-current-buffer (erefactor-lint-get-buffer)
+(defun erefactor-lint--initialize ()
+  (with-current-buffer (erefactor-lint--get-buffer)
     (let ((inhibit-read-only t)
           buffer-read-only)
       (erase-buffer))))
 
-(defun erefactor-lint-command-args (command file &optional temp-file)
+(defun erefactor-lint--command-args (command file &optional temp-file)
   (let* ((path (erefactor-ref file erefactor-lint-path-alist))
          (version (erefactor-emacs-version command t))
          (sexp `(progn
@@ -1027,14 +1027,14 @@ Examples:
                   (with-current-buffer "*Elint*"
                     (princ (buffer-string)))))
          (eval-form (prin1-to-string sexp))
-         (buffer (erefactor-lint-get-buffer))
+         (buffer (erefactor-lint--get-buffer))
          cmdline)
     (list "-batch" "-eval" eval-form)))
 
-(defun erefactor-lint-get-buffer ()
+(defun erefactor-lint--get-buffer ()
   (get-buffer-create "*Async Elint*"))
 
-(defun erefactor-lint-append (&rest strings)
+(defun erefactor-lint--append (&rest strings)
   (let (buffer-read-only)
     (goto-char (point-max))
     (apply 'insert strings)))
@@ -1043,27 +1043,27 @@ Examples:
 (defun erefactor-lint ()
   "Execuet Elint in new Emacs process."
   (interactive)
-  (erefactor-lint-initialize)
+  (erefactor-lint--initialize)
   (let ((command (expand-file-name (invocation-name) (invocation-directory)))
         (file (expand-file-name (buffer-file-name))))
-    (let ((proc (erefactor-lint-internal command file)))
+    (let ((proc (erefactor-lint--internal command file)))
       (set-process-sentinel proc
                             (lambda (p e)
                               (when (eq (process-status p) 'exit)
-                                (erefactor-lint-exit-mode-line p)))))))
+                                (erefactor-lint--exit-mode-line p)))))))
 
 ;;;###autoload
 (defun erefactor-lint-by-emacsen ()
   "Execuet Elint in new Emacs processes.
 See variable `erefactor-lint-emacsen'."
   (interactive)
-  (when (erefactor-lint-running-p)
+  (when (erefactor-lint--running-p)
     (error "Active process is running"))
   (unless erefactor-lint-emacsen
     (error "No command found."))
   (let ((file (expand-file-name (buffer-file-name))))
-    (erefactor-lint-initialize)
-    (erefactor-lint-async file erefactor-lint-emacsen)))
+    (erefactor-lint--initialize)
+    (erefactor-lint--async file erefactor-lint-emacsen)))
 
 ;;;
 ;;; flymake (experimental)
@@ -1118,7 +1118,7 @@ See variable `erefactor-lint-emacsen'."
           (write-region (point-min) (point-max) erefactor-flymake-temp-file nil 'no-msg)
           (setq temp-file erefactor-flymake-temp-file))))
     (list command
-          (erefactor-lint-command-args command file temp-file))))
+          (erefactor-lint--command-args command file temp-file))))
 
 (defalias 'erefactor-flymake--have-errs-p 'erefactor-flymake--data)
 
