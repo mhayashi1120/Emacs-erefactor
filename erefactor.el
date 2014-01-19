@@ -100,7 +100,6 @@
 
 ;; externals
 (defvar load-path)
-(defvar obarray)
 (defvar shell-command-switch)
 (defvar shell-file-name)
 (defvar load-history)
