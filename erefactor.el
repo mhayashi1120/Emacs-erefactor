@@ -4,7 +4,7 @@
 ;; Keywords: extensions, tools, maint
 ;; URL: https://github.com/mhayashi1120/Emacs-erefactor/raw/master/erefactor.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 0.6.11
+;; Version: 0.6.12
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -294,6 +294,27 @@
        (symbolp (cadar catch-arg))
        (eq (cadar catch-arg) name)))
 
+;; list only generally using
+(defvar erefactor-def-alist
+  '(
+    ;; Variable cell
+    (defvar defvar)
+    (defcustom defvar)
+    (defconst defvar)
+
+    ;; Function cell
+    (defun defun)
+    (defmacro defun)
+    (defun*  defun)
+    (defmacro* defun)
+
+    ;; Face
+    (defface defface)
+
+    ;; Misc
+    (define-minor-mode defun defvar)
+    ))
+
 ;;;###autoload
 (defun erefactor-rename-symbol-in-package (old-name new-name)
   "Rename symbol at point with queries.
@@ -359,27 +380,6 @@ This is usefull when creating new definition."
   (eval-defun edebug-it)
   (when buffer-file-name
     (erefactor-add-current-defun)))
-
-;; list only generally using
-(defvar erefactor-def-alist
-  '(
-    ;; Variable cell
-    (defvar defvar)
-    (defcustom defvar)
-    (defconst defvar)
-
-    ;; Function cell
-    (defun defun)
-    (defmacro defun)
-    (defun*  defun)
-    (defmacro* defun)
-
-    ;; Face
-    (defface defface)
-
-    ;; Misc
-    (define-minor-mode defun defvar)
-    ))
 
 (defun erefactor-after-rename-symbol (old-name new-name)
   (save-match-data
@@ -556,6 +556,16 @@ This is usefull when creating new definition."
 (defvar erefactor-highlighting-overlays nil)
 (make-variable-buffer-local 'erefactor-highlighting-overlays)
 
+(defvar erefactor-highlight-map nil)
+
+(unless erefactor-highlight-map
+  (let ((map (make-sparse-keymap)))
+
+    (define-key map (kbd "M-<left>") 'erefactor-highlight-previous-symbol)
+    (define-key map (kbd "M-<right>") 'erefactor-highlight-next-symbol)
+
+    (setq erefactor-highlight-map map)))
+
 (defun erefactor-highlight-update-region (start end regexp &optional ignore-case check)
   "highlight START to END word that match to REGEXP.
 CHECK is function that accept no arg and return boolean."
@@ -717,6 +727,13 @@ Force to dehighlight \\[erefactor-dehighlight-all-symbol]"
 ;;; lazy highlight local variable
 ;;;
 
+(defvar erefactor-lazy-highlight--timer nil)
+
+(defvar erefactor-lazy-highlight--suspended nil)
+(make-variable-buffer-local 'erefactor-lazy-highlight--suspended)
+
+(defvar ahs-face-check-include-overlay)
+
 (define-minor-mode erefactor-highlight-mode
   "Toggle highlight mode on or off.
 In highlight mode, the highlight the current symbol if recognize
@@ -742,11 +759,6 @@ as a local variable.
 
 (defun erefactor-lazy-highlight-resume ()
   (setq erefactor-lazy-highlight--suspended nil))
-
-(defvar erefactor-lazy-highlight--timer nil)
-
-(defvar erefactor-lazy-highlight--suspended nil)
-(make-variable-buffer-local 'erefactor-lazy-highlight--suspended)
 
 (defun erefactor-lazy-highlight--stop ()
   (when erefactor-lazy-highlight--timer
@@ -839,6 +851,10 @@ as a local variable.
    (t
     `(called-interactively-p 'any))))
 
+(defvar erefactor--check-eval-alist
+  '((eval-last-sexp after erefactor-check-eval-last-sexp)
+    (eval-defun after erefactor-check-eval-defun)))
+
 ;;;###autoload
 (define-minor-mode erefactor-check-eval-mode
   "Display compiling warnings when \\[eval-last-sexp], \\[eval-defun]
@@ -851,10 +867,6 @@ as a local variable.
              'ad-disable-advice)))
       (funcall enabler (nth 0 x) (nth 1 x) (nth 2 x))
       (funcall 'ad-activate (nth 0 x)))))
-
-(defvar erefactor--check-eval-alist
-  '((eval-last-sexp after erefactor-check-eval-last-sexp)
-    (eval-defun after erefactor-check-eval-defun)))
 
 (defadvice eval-last-sexp
   (after erefactor-check-eval-last-sexp (edebug-it) activate)
@@ -1111,6 +1123,9 @@ See variable `erefactor-lint-emacsen'."
 (defconst erefactor-flymake-error-line-patterns
   '("^\\([^:]+\\.el\\):\\([0-9]+\\):\\([0-9]+\\):[ ]*\\(.+\\)" 1 2 3 4))
 
+(defvar erefactor-flymake-temp-file nil)
+(defconst erefactor-flymake-error-buffer-name " *Erefactor errors* ")
+
 (when (boundp 'flymake-allowed-file-name-masks)
   (add-to-list 'flymake-allowed-file-name-masks
                erefactor-flymake-allowed-file-name-masks))
@@ -1149,9 +1164,6 @@ See variable `erefactor-lint-emacsen'."
           (setq temp-file erefactor-flymake-temp-file))))
     (list command
           (erefactor-lint-command-args command file temp-file))))
-
-(defvar erefactor-flymake-temp-file nil)
-(defconst erefactor-flymake-error-buffer-name " *Erefactor errors* ")
 
 (defalias 'erefactor-flymake-have-errs-p 'erefactor-flymake-data)
 
@@ -1256,16 +1268,6 @@ See variable `erefactor-lint-emacsen'."
     (define-key map "?" 'erefactor-flymake-display-errors)
 
     map))
-
-(defvar erefactor-highlight-map nil)
-
-(unless erefactor-highlight-map
-  (let ((map (make-sparse-keymap)))
-
-    (define-key map (kbd "M-<left>") 'erefactor-highlight-previous-symbol)
-    (define-key map (kbd "M-<right>") 'erefactor-highlight-next-symbol)
-
-    (setq erefactor-highlight-map map)))
 
 ;;;###autoload(add-hook 'emacs-lisp-mode-hook 'erefactor-lazy-highlight-turn-on)
 ;;;###autoload(add-hook 'lisp-interaction-mode-hook 'erefactor-lazy-highlight-turn-on)
