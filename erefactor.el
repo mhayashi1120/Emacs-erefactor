@@ -4,7 +4,7 @@
 ;; Keywords: extensions, tools, maint
 ;; URL: https://github.com/mhayashi1120/Emacs-erefactor/raw/master/erefactor.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 0.6.12
+;; Version: 0.6.13
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as

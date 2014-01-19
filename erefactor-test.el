@@ -24,17 +24,23 @@
   (should-not (erefactor--local-binding-p 'tag '(catch 'tag1 tag))))
 
 ;; TODO comment out for now
-;; (ert-deftest erefactor-local-bindings-in-macro ()
-;;   :tags '(erefactor)
+(ert-deftest erefactor-local-bindings-in-macro ()
+  :tags '(erefactor)
 
-;;   (should (erefactor--macroexpand-contains-p 'v '(defun* f (v))))
-;;   (should (erefactor--macroexpand-contains-p 'k1 '(defun* f (v1 &key k1))))
-;;   (should-not (erefactor--macroexpand-contains-p 'v '(defun* f (v1) v)))
+  ;; need to macro expand when execute time
+  (require 'cl)
 
-;;   ;; check ignoring failed (defface) form expansion
-;;   (should-not (erefactor--macroexpand-contains-p 'v1 '(when test (case v1 (defface)))))
+  (should (erefactor--macroexpand-contains-p 'v '(defun* f (v))))
+  (should (erefactor--macroexpand-contains-p 'k1 '(defun* f (v1 &key k1))))
+  (should-not (erefactor--macroexpand-contains-p 'v '(defun* f (v1) v)))
 
-;;   ;; cannot test `erefactor--local-fbinding' because that move point.
-;;   )
+  ;; check ignoring failed (defface) form expansion
+  (should-not (erefactor--macroexpand-contains-p 'v1 '(when test (case v1 (defface)))))
 
+  ;; cannot test `erefactor--local-fbinding' because that move point.
+  )
+
+
+
+;; (macroexpand-all '(erefactor--macroexpand-contains-p 'v '(defun* f (v))))
 
