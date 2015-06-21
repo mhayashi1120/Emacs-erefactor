@@ -2,9 +2,10 @@
 
 ;; Author: Masahiro Hayashi <mhayashi1120@gmail.com>
 ;; Keywords: extensions, tools, maint
-;; URL: https://github.com/mhayashi1120/Emacs-erefactor/raw/master/erefactor.el
-;; Emacs: GNU Emacs 22 or later
-;; Version: 0.6.13
+;; URL: https://github.com/mhayashi1120/Emacs-erefactor
+;; Emacs: GNU Emacs 23 or later
+;; Package-Requires: ((cl-lib "0.3"))
+;; Version: 0.7.0
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -25,7 +26,7 @@
 
 ;; Simple refactoring, linting utilities for Emacs-Lisp.
 
-;;; Install:
+;; ## Install:
 
 ;; Put this file into load-path'ed directory,
 ;; and byte compile its if desired.
@@ -37,54 +38,53 @@
 ;;          (define-key emacs-lisp-mode-map "\C-c\C-v" erefactor-map)))
 ;;
 ;; And set these variables correctly.
-;;  `erefactor-lint-path-alist', `erefactor-lint-by-emacsen'
+;;  `erefactor-lint-path-alist`, `erefactor-lint-by-emacsen`
 
 ;; Put the following in your .emacs, if you desire highlighting local variable.
 ;;
 ;;     (add-hook 'emacs-lisp-mode-hook 'erefactor-lazy-highlight-turn-on)
 ;;     (add-hook 'lisp-interaction-mode-hook 'erefactor-lazy-highlight-turn-on)
 
-;;; Usage:
+;; ## Usage:
 
-;; C-c C-v l : elint current buffer in clean environment.
-;; C-c C-v L : elint current buffer by multiple emacs binaries.
-;;             See `erefactor-lint-emacsen'
-;; C-c C-v r : Rename symbol in current buffer.
-;;             Resolve `let' binding as long as i can.
-;; C-c C-v R : Rename symbol in requiring modules and current buffer.
-;; C-c C-v h : Highlight current symbol in this buffer
-;;             and suppress `erefacthr-highlight-mode'.
-;; C-c C-v d : Dehighlight all by above command.
-;; C-c C-v c : Switch prefix bunch of symbols.
+;; `C-c C-v l` : elint current buffer in clean environment.
+;; `C-c C-v L` : elint current buffer by multiple emacs binaries.
+;;             See `erefactor-lint-emacsen`
+;; `C-c C-v r` : Rename symbol in current buffer.
+;;             Resolve `let` binding as long as i can.
+;; `C-c C-v R` : Rename symbol in requiring modules and current buffer.
+;; `C-c C-v h` : Highlight current symbol in this buffer
+;;             and suppress `erefacthr-highlight-mode`.
+;; `C-c C-v d` : Dehighlight all by above command.
+;; `C-c C-v c` : Switch prefix bunch of symbols.
 ;;             ex: '(hoge-var hoge-func) -> '(foo-var foo-func)
-;; C-c C-v ? : Display flymake elint warnings/errors
+;; `C-c C-v ?` : Display flymake elint warnings/errors
 
-;; * To show compilation warnings when evaluate `defun' form.
+;; * To show compilation warnings when evaluate `defun` form.
 ;;
-;;   M-x erefactor-check-eval-mode
-
+;;     M-x erefactor-check-eval-mode
 
 ;;; TODO:
 ;; * Change only same case if symbol. But docstring is not.
 ;;
 ;; * `.' is not a separator of lisp symbol.
-;;   rename `region' symbol and `REGION.' in docstring
+;;   rename `region` symbol and `REGION.` in docstring
 ;;   don't use re-search while idiom,
 ;;   gather symbols in code, string, comment each context.
-;; (defun hoge (region)
-;;   "REGION is REGION."
-;;   region)
+;;     (defun hoge (region)
+;;       "REGION is REGION."
+;;       region)
 ;;
-;;  don't forget about `quoted' symbol.
+;;  don't forget about `quoted` symbol.
 
 ;; * macroexpand misunderstand local variable
 ;;
-;; (defmacro hogemacro (&rest form)
-;;   `(progn
-;;      ,@form
-;;      (let (a))))
+;;     (defmacro hogemacro (&rest form)
+;;       `(progn
+;;          ,@form
+;;          (let (a))))
 ;; =>
-;; (hogemacro a) <= `a' is not bounded in this context.
+;;     (hogemacro a) <= `a' is not bounded in this context.
 ;;
 ;; * Separate elint and flymake to other elisp file.
 ;;
@@ -94,8 +94,9 @@
 
 ;;; Code:
 
+(require 'cl-lib)
+
 (eval-when-compile
-  (require 'cl)
   (require 'easy-mmode))
 
 ;; externals
@@ -142,15 +143,15 @@
   (apply 'append (mapcar func list)))
 
 (defun erefactor--union (list1 list2)
-  (loop for a in (append list1 list2)
-        unless (member a res)
-        collect a into res
-        finally return res))
+  (cl-loop for a in (append list1 list2)
+           unless (member a res)
+           collect a into res
+           finally return res))
 
 (defun erefactor--find (pred list)
-  (loop for a in list
-        if (funcall pred a)
-        return a))
+  (cl-loop for a in list
+           if (funcall pred a)
+           return a))
 
 (defmacro erefactor-interactive-p ()
   (cond
@@ -270,17 +271,17 @@
    (and (memq (car-safe form) '(let let* lexical-let lexical-let*))
         (erefactor--let-binding-contains-p (cadr form) name))
    (and (memq (car-safe form) '(defun defmacro))
-        (erefactor--lambda-binding-contains-p (caddr form) name))
+        (erefactor--lambda-binding-contains-p (cl-caddr form) name))
    (and (eq (car-safe form) 'lambda)
         (erefactor--lambda-binding-contains-p (cadr form) name))
    (and (eq (car-safe form) 'defadvice)
-        (erefactor--defadvice-binding-contains-p (caddr form) name))
+        (erefactor--defadvice-binding-contains-p (cl-caddr form) name))
    (and (eq (car-safe form) 'catch)
         (erefactor--catch-binding-contains-p (cdr form) name))
    (and (eq (car-safe form) 'condition-case)
         (erefactor--condition-case-contains-p (cdr form) name))
    (and (eq (car-safe form) 'eieio-defmethod)
-        (erefactor--eieio-defmethod-contains-p (caadr (caddr form)) name))))
+        (erefactor--eieio-defmethod-contains-p (caadr (cl-caddr form)) name))))
 
 ;; To avoid too many recursion.
 ;; Slow down the emacs if form contains a lot of macro. (ex: ert-deftest)
@@ -348,8 +349,8 @@
   "Consider (catch variable ...) like form."
   (and (listp (car catch-arg))
        (eq (caar catch-arg) 'quote)
-       (symbolp (cadar catch-arg))
-       (eq (cadar catch-arg) name)))
+       (symbolp (cl-cadar catch-arg))
+       (eq (cl-cadar catch-arg) name)))
 
 (defun erefactor-context-code-p (&optional point)
   (save-excursion
@@ -404,16 +405,16 @@
 (defun erefactor--symbol-defined-alist (symbol)
   ;; FUNCS FACES VARS have file names.
   (let (funcs faces vars)
-    (loop for (file . entries) in load-history
-          do (let (tmp)
-               (when (memq symbol entries)
-                 (push file vars))
-               (when (and (setq tmp (rassq symbol entries))
-                          (eq (car tmp) 'defface))
-                 (push file faces))
-               (when (and (setq tmp (rassq symbol entries))
-                          (eq (car tmp) 'defun))
-                 (push file funcs))))
+    (cl-loop for (file . entries) in load-history
+             do (let (tmp)
+                  (when (memq symbol entries)
+                    (push file vars))
+                  (when (and (setq tmp (rassq symbol entries))
+                             (eq (car tmp) 'defface))
+                    (push file faces))
+                  (when (and (setq tmp (rassq symbol entries))
+                             (eq (car tmp) 'defun))
+                    (push file funcs))))
     `((defun . ,funcs)
       (defface . ,faces)
       (defvar . ,vars))))
@@ -468,13 +469,13 @@
 ;; get a sources that is defined SYMBOL as TYPE
 (defun erefactor--symbol-using-sources (type symbol)
   (let ((package (erefactor--symbol-package type symbol)))
-    (loop for defs in load-history
-          when (loop for def in (cdr defs)
-                     when (and (listp def)
-                               (eq (car def) 'require)
-                               (eq package (cdr def)))
-                     collect def)
-          collect (car defs))))
+    (cl-loop for defs in load-history
+             when (cl-loop for def in (cdr defs)
+                           when (and (listp def)
+                                     (eq (car def) 'require)
+                                     (eq package (cdr def)))
+                           collect def)
+             collect (car defs))))
 
 (defun erefactor-after-rename-symbol (old-name new-name)
   (save-match-data
@@ -753,7 +754,7 @@ CHECK is function that accept no arg and return boolean."
         (error nil)))))
 
 (defun erefactor-hl--move-symbol (forward-p)
-  (let* ((ovs (sort (copy-seq erefactor-hl--overlays)
+  (let* ((ovs (sort (copy-sequence erefactor-hl--overlays)
                     `(lambda (x y)
                        (,(if forward-p '< '>)
                         (overlay-start x)
@@ -1095,12 +1096,12 @@ See variable `erefactor-lint-emacsen'."
 
 (defun erefactor-flymake--get-real-file-name (name)
   (or
-   (loop with temp-name = name
-         for b in (buffer-list)
-         when (let ((value (buffer-local-value 'erefactor-flymake-temp-file b)))
-                (and value
-                     (string= temp-name (file-name-nondirectory value))))
-         return (buffer-file-name b))
+   (cl-loop with temp-name = name
+            for b in (buffer-list)
+            when (let ((value (buffer-local-value 'erefactor-flymake-temp-file b)))
+                   (and value
+                        (string= temp-name (file-name-nondirectory value))))
+            return (buffer-file-name b))
    (buffer-file-name)))
 
 (defun erefactor-flymake--init ()
@@ -1146,8 +1147,12 @@ See variable `erefactor-lint-emacsen'."
 (defun erefactor-flymake--err-get-title (x) (nth 0 x))
 (defun erefactor-flymake--err-get-errs (x) (nth 1 x))
 
+(defun erefactor-flymake--current-line-no ()
+  ;; come from flymake 23.4
+  (count-lines (point-min) (if (eobp) (point) (1+ (point)))))
+
 (defun erefactor-flymake--data ()
-  (let* ((line-no (flymake-current-line-no))
+  (let* ((line-no (erefactor-flymake--current-line-no))
          (info (nth 0 (flymake-find-err-info flymake-err-info line-no))))
     (flymake-make-err-menu-data line-no info)))
 
@@ -1160,6 +1165,11 @@ See variable `erefactor-lint-emacsen'."
 ;;;
 ;;; Main commands
 ;;;
+
+(defun erefactor--rename-in-files (old-name new-name files)
+  (dolist (file files)
+    (erefactor--with-file file
+      (erefactor-rename-region old-name new-name))))
 
 ;;;###autoload
 (defun erefactor-rename-symbol-in-package (old-name new-name)
@@ -1175,9 +1185,7 @@ the module have observance of `require'/`provide' system."
     (when (buffer-file-name)
       (unless (member (buffer-file-name) guessed-files)
         (setq guessed-files (cons (buffer-file-name) guessed-files))))
-    (dolist (file guessed-files)
-      (erefactor--with-file file
-        (erefactor-rename-region old-name new-name)))))
+    (erefactor--rename-in-files old-name new-name guessed-files)))
 
 ;;;###autoload
 (defun erefactor-rename-symbol-in-buffer (old-name new-name)
