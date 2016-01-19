@@ -281,7 +281,7 @@
    (and (eq (car-safe form) 'condition-case)
         (erefactor--condition-case-contains-p (cdr form) name))
    (and (eq (car-safe form) 'eieio-defmethod)
-        (erefactor--eieio-defmethod-contains-p (caadr (cl-caddr form)) name))))
+        (erefactor--eieio-defmethod-contains-p (cl-caadr (cl-caddr form)) name))))
 
 ;; To avoid too many recursion.
 ;; Slow down the emacs if form contains a lot of macro. (ex: ert-deftest)
