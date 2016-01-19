@@ -307,13 +307,14 @@
       (error nil))))
 
 (defun erefactor--binding-exists-p (name form)
-  (dolist (f form)
-    (when (or (erefactor--local-binding-p name f)
-              (erefactor--macroexpand-contains-p name f))
-      (return t))
-    (when (and (listp f)
-               (erefactor--binding-exists-p name f))
-      (return t))))
+  (catch 'found
+    (dolist (f form)
+      (when (or (erefactor--local-binding-p name f)
+                (erefactor--macroexpand-contains-p name f))
+        (throw 'found t))
+      (when (and (listp f)
+                 (erefactor--binding-exists-p name f))
+        (throw 'found t)))))
 
 (defun erefactor--condition-case-contains-p (form name)
   (let ((var (car-safe form)))
@@ -461,10 +462,11 @@
 (defun erefactor--symbol-package (type symbol)
   (let* ((defs (erefactor--symbol-defined-alist symbol))
          (files (cdr (assq type defs))))
-    (dolist (file files)
-      (let ((tmp (cdr (assq 'provide (cdr (assoc file load-history))))))
-        (when tmp
-          (return tmp))))))
+    (catch 'done
+      (dolist (file files)
+        (let ((tmp (cdr (assq 'provide (cdr (assoc file load-history))))))
+          (when tmp
+            (throw 'done tmp)))))))
 
 ;; get a sources that is defined SYMBOL as TYPE
 (defun erefactor--symbol-using-sources (type symbol)
@@ -703,10 +705,11 @@ CHECK is function that accept no arg and return boolean."
 
 (defun erefactor-lhl--stop ()
   (when erefactor-lhl--timer
-    (unless (dolist (buf (buffer-list))
-              (with-current-buffer buf
-                (when erefactor-highlight-mode
-                  (return t))))
+    (unless (catch 'done
+              (dolist (buf (buffer-list))
+                (with-current-buffer buf
+                  (when erefactor-highlight-mode
+                    (throw 'done t)))))
       (cancel-timer erefactor-lhl--timer)
       (setq erefactor-lhl--timer nil))))
 
