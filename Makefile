@@ -7,5 +7,5 @@ check: compile
 		-f ert-run-tests-batch-and-exit
 
 compile:
-	$(EMACS) -q -batch -f batch-byte-compile \
-		erefactor.el
+	$(EMACS) --version
+	$(EMACS) -q -batch -f batch-byte-compile erefactor.el
