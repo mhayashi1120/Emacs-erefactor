@@ -913,11 +913,17 @@ as a local variable.
       (funcall enabler (nth 0 x) (nth 1 x) (nth 2 x))
       (funcall 'ad-activate (nth 0 x)))))
 
+;; Emacs 25 renamed `preceding-sexp' to `elisp--preceding-sexp' and
+;; added a deprecation warning to using the old name. However some
+;; supported versions of Emacs don't have this alias.
+(unless (fboundp 'elisp--preceding-sexp)
+  (defalias 'elisp--preceding-sexp 'preceding-sexp))
+
 (defadvice eval-last-sexp
   (after erefactor-check-eval-last-sexp (edebug-it) activate)
   (when (erefactor-interactive-p)
-    ;; call `preceding-sexp' same as `eval-last-sexp'
-    (erefactor-check--form (preceding-sexp))))
+    ;; call `elisp--preceding-sexp' same as `eval-last-sexp'
+    (erefactor-check--form (elisp--preceding-sexp))))
 
 (defadvice eval-defun
   (after erefactor-check-eval-defun (edebug-it) activate)
