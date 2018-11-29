@@ -38,4 +38,4 @@ Put the following in your `.emacs`, if you desire highlighting local variables.
 
 * To show compilation warnings when you evaluate a `defun` form:
 
-    M-x erefactor-check-eval-mode
+    `M-x erefactor-check-eval-mode`
