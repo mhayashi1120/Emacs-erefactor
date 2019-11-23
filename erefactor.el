@@ -1,11 +1,10 @@
 ;;; erefactor.el --- Emacs-Lisp refactoring utilities
 
 ;; Author: Masahiro Hayashi <mhayashi1120@gmail.com>
-;; Keywords: extensions, tools, maint
 ;; URL: https://github.com/mhayashi1120/Emacs-erefactor
-;; Emacs: GNU Emacs 24 or later
-;; Package-Requires: ((cl-lib "0.3"))
+;; Package-Requires: ((emacs "24") (cl-lib "0.3"))
 ;; Version: 0.7.1
+;; Keywords: extensions, tools, maint
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -48,7 +47,7 @@
 ;; ## Usage:
 
 ;; `C-c C-v l` : elint current buffer in clean environment.
-;; `C-c C-v L` : elint current buffer by multiple emacs binaries.
+;; `C-c C-v L` : elint current buffer by multiple Emacs binaries.
 ;;             See `erefactor-lint-emacsen`
 ;; `C-c C-v r` : Rename symbol in current buffer.
 ;;             Resolve `let` binding as long as i can.
@@ -387,8 +386,7 @@
     (defface defface)
 
     ;; Misc
-    (define-minor-mode defun defvar)
-    ))
+    (define-minor-mode defun defvar)))
 
 (defun erefactor--current-fnsym ()
   (save-excursion
@@ -575,7 +573,8 @@
     (setq erefactor-highlight-map map)))
 
 (defun erefactor-hl--update-region (start end regexp &optional ignore-case check)
-  "highlight START to END word that match to REGEXP.
+  "Highlight START to END word that match to REGEXP.
+If IGNORE-CASE is non-nil, search with ignore case.
 CHECK is function that accept no arg and return boolean."
   (save-match-data
     (save-excursion
@@ -637,7 +636,7 @@ CHECK is function that accept no arg and return boolean."
                (point-marker)))
         regexp)
     (when (or (not (erefactor--already-bounded new-symbol start end))
-              (y-or-n-p (format "%s is already bound. Continue? " new-symbol)))
+              (y-or-n-p (format "%s is already bound.  Continue? " new-symbol)))
       (save-excursion
         (setq erefactor--region-start start)
         (setq erefactor--region-end end)
@@ -939,8 +938,7 @@ as a local variable.
 
 Examples:
 \(setq erefactor-lint-emacsen
-    '\(\"emacs-21\" \"emacs-22.1\" \"emacs-23.2\" \"emacs-current\"))
-"
+    '\(\"emacs-21\" \"emacs-22.1\" \"emacs-23.2\" \"emacs-current\"))"
   :group 'erefactor
   :type '(list file))
 
@@ -954,8 +952,7 @@ Examples:
        \"/home/bob/.emacs.d/misc\"))
 
 
-\"/home/bob/.emacs.d/misc\" directory have some requiring module(s).
-"
+\"/home/bob/.emacs.d/misc\" directory have some requiring module(s)."
   :group 'erefactor
   :type '(list (list file)))
 
@@ -1064,7 +1061,7 @@ See variable `erefactor-lint-emacsen'."
   (when (erefactor-lint--running-p)
     (error "Active process is running"))
   (unless erefactor-lint-emacsen
-    (error "No command found."))
+    (error "No command found"))
   (let ((file (expand-file-name (buffer-file-name))))
     (erefactor-lint--initialize)
     (erefactor-lint--async file erefactor-lint-emacsen)))
@@ -1093,6 +1090,7 @@ See variable `erefactor-lint-emacsen'."
   (add-to-list 'flymake-err-line-patterns
                erefactor-flymake--error-line-patterns))
 
+(defvar flymake-last-change-time)
 (defun erefactor-flymake--cleanup ()
   (flymake-safe-delete-file erefactor-flymake-temp-file)
   (setq flymake-last-change-time nil))
@@ -1193,7 +1191,7 @@ the module have observance of `require'/`provide' system."
 ;;;###autoload
 (defun erefactor-rename-symbol-in-buffer (old-name new-name)
   "Rename symbol at point resolving reference local variable
-as long as i can with queries. This affect to current buffer."
+as long as i can with queries.  This affect to current buffer."
   (interactive
    (erefactor-rename-symbol-read-args))
   (let ((region (erefactor--find-local-binding old-name)))
@@ -1212,7 +1210,7 @@ OLD-PREFIX: `foo-' -> NEW-PREFIX: `baz-'
 
 ;;;###autoload
 (defun erefactor-add-current-defun ()
-  "Add current defun form to `load-history'
+  "Add current defun form to `load-history'.
 This is usefull when creating new definition."
   (interactive)
   (unless (buffer-file-name)
@@ -1266,7 +1264,6 @@ Force to dehighlight \\[erefactor-dehighlight-all-symbol]"
 ;;;###autoload
 (defvar erefactor-map
   (let ((map (make-sparse-keymap)))
-
     (define-key map "L" 'erefactor-lint-by-emacsen)
     (define-key map "R" 'erefactor-rename-symbol-in-package)
     (define-key map "A" 'erefactor-add-current-defun)
@@ -1277,13 +1274,13 @@ Force to dehighlight \\[erefactor-dehighlight-all-symbol]"
     (define-key map "r" 'erefactor-rename-symbol-in-buffer)
     (define-key map "x" 'erefactor-eval-current-defun)
     (define-key map "?" 'erefactor-flymake-display-errors)
-
     map))
 
 ;;
 ;; Compatibility for other elisp
 ;;
 
+(defvar ahs-inhibit-face-list)
 (eval-after-load 'auto-highlight-symbol
   `(progn
      (add-to-list 'ahs-inhibit-face-list 'erefactor-highlight-face)))
