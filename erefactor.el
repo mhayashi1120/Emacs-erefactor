@@ -5,7 +5,7 @@
 ;; URL: https://github.com/mhayashi1120/Emacs-erefactor
 ;; Emacs: GNU Emacs 24 or later
 ;; Package-Requires: ((cl-lib "0.3"))
-;; Version: 0.7.1
+;; Version: 0.7.2
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
