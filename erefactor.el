@@ -917,7 +917,10 @@ as a local variable.
   (after erefactor-check-eval-last-sexp (edebug-it) activate)
   (when (erefactor-interactive-p)
     ;; call `preceding-sexp' same as `eval-last-sexp'
-    (erefactor-check--form (preceding-sexp))))
+    (erefactor-check--form (if (fboundp 'elisp--preceding-sexp)
+                               (elisp--preceding-sexp)
+                             (with-no-warnings
+                               (preceding-sexp))))))
 
 (defadvice eval-defun
   (after erefactor-check-eval-defun (edebug-it) activate)
